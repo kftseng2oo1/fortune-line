@@ -28,6 +28,11 @@ scripts/
   setup-richmenu.mjs   建立並套用圖文選單
   extract-ziwei.py     從 z1 重新抽出安星引擎
   extract-astro.py     從 Astro 重新抽出星座運勢
+  make-icon.py         產生 assets/ 裡的圖示
+assets/
+  icon-1024.png        LINE Login channel 的 App icon
+  line-profile-640.png 官方帳號大頭貼（會被裁成圓形，主體已在安全區內）
+  favicon-32.png、apple-touch-icon.png、icon-192/512.png  網頁圖示
 test/
   webhook-sim.mjs      模擬整段 LINE 對話（11 項檢查）
   engine-parity.mjs    與 z1 原始碼逐宮比對 600 組生辰（含晚子時、農曆輸入）
