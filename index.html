@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>設定生辰・每日命盤運勢</title>
+<style>
+  :root { --bg:#FBF6EC; --card:#FFFFFF; --ink:#3A2E1F; --sub:#8C7B5E; --line:#E8DFCC; --accent:#8E6B2F; --err:#B03A2E; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; -webkit-text-size-adjust:100%; }
+  .wrap { max-width:520px; margin:0 auto; padding:20px 16px 40px; }
+  h1 { font-size:22px; margin:4px 0 4px; }
+  .lead { color:var(--sub); font-size:14px; margin:0 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .row { display:flex; align-items:center; gap:8px; margin:10px 0; flex-wrap:wrap; }
+  .lb { width:64px; flex:none; color:var(--sub); font-size:14px; }
+  select, input[type=number] { flex:1; min-width:0; font-size:16px; padding:9px 8px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); -webkit-appearance:none; appearance:none; }
+  .seg { display:flex; flex:1; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { flex:1; border:0; background:#fff; padding:9px 0; font-size:16px; color:var(--ink); white-space:nowrap; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .chk { display:flex; align-items:center; gap:6px; font-size:15px; }
+  .chk input { width:20px; height:20px; }
+  .hidden { display:none !important; }
+  details { margin-top:6px; }
+  summary { color:var(--accent); font-size:14px; padding:6px 0; }
+  .hint { color:var(--sub); font-size:13px; }
+  .btn { display:block; width:100%; border:0; border-radius:12px; padding:14px; font-size:17px; font-weight:600; background:var(--accent); color:#fff; margin-top:6px; }
+  .btn:disabled { opacity:.5; }
+  .btn.ghost { background:transparent; color:var(--err); border:1px solid var(--line); font-weight:400; font-size:15px; }
+  .consent { font-size:14px; align-items:flex-start; flex-wrap:nowrap; }
+  .consent input { margin-top:3px; flex:none; }
+  .consent span { flex:1; min-width:0; }
+  input[type=checkbox] { accent-color:var(--accent); }
+  a { color:var(--accent); }
+  .msg { padding:12px; border-radius:10px; font-size:15px; white-space:pre-line; margin-top:12px; }
+  .msg.ok { background:#F1EADA; }
+  .msg.err { background:#FBEAE8; color:var(--err); }
+  .confirm { background:#FBEAE8; border-radius:10px; padding:12px; margin-top:10px; font-size:15px; }
+  .confirm .row { margin:8px 0 0; }
+  .confirm button { flex:1; padding:10px; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:15px; }
+  .confirm button.danger { background:var(--err); color:#fff; border-color:var(--err); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>設定你的生辰</h1>
+  <p class="lead">輸入一次即可，之後每天在 LINE 點「今日運勢」就會依你的紫微命盤推算。</p>
+
+  <div id="loading" class="card">讀取中…</div>
+
+  <div id="form" class="hidden">
+    <div class="card">
+      <div class="row"><span class="lb">性別</span>
+        <div class="seg" id="segGender"><button type="button" data-v="M" class="on">男</button><button type="button" data-v="F">女</button></div>
+      </div>
+      <div class="row"><span class="lb">血型</span>
+        <div class="seg" id="segBlood"><button type="button" data-v="A">A</button><button type="button" data-v="B">B</button><button type="button" data-v="O">O</button><button type="button" data-v="AB">AB</button><button type="button" data-v="" class="on">不知道</button></div>
+      </div>
+      <div class="row"><span class="lb">曆法</span>
+        <div class="seg" id="segCal"><button type="button" data-v="solar" class="on">國曆</button><button type="button" data-v="lunar">農曆</button></div>
+      </div>
+      <div class="row"><span class="lb">日期</span>
+        <select id="fY" aria-label="年"></select><select id="fM" aria-label="月"></select><select id="fD" aria-label="日"></select>
+      </div>
+      <div class="row hidden" id="leapWrap"><span class="lb"></span><label class="chk"><input type="checkbox" id="fLeap">閏月</label></div>
+      <div class="row"><span class="lb">時辰</span>
+        <select id="fHour" aria-label="出生時辰">
+          <option value="0">早子時（00–01）</option><option value="1">丑時（01–03）</option><option value="2">寅時（03–05）</option>
+          <option value="3">卯時（05–07）</option><option value="4">辰時（07–09）</option><option value="5">巳時（09–11）</option>
+          <option value="6" selected>午時（11–13）</option><option value="7">未時（13–15）</option><option value="8">申時（15–17）</option>
+          <option value="9">酉時（17–19）</option><option value="10">戌時（19–21）</option><option value="11">亥時（21–23）</option>
+          <option value="12">晚子時（23–24）</option>
+        </select>
+      </div>
+      <p class="hint">紫微斗數的命宮由出生時辰決定，請盡量填準。設定方式與「紫微斗數AI大師」App 相同，排出的命盤一致；血型只用在西洋星座參考卡，不知道也沒關係。</p>
+    </div>
+
+    <div class="card">
+      <label class="row chk consent"><input type="checkbox" id="fConsent">
+        <span>我同意將出生資料用於排盤與每日運勢，資料不含姓名、不提供給第三方。詳見<a id="privacyLink" href="privacy.html">隱私政策</a>。</span>
+      </label>
+      <button class="btn" id="btnSave" type="button" disabled>儲存並排盤</button>
+      <div id="result" class="msg hidden"></div>
+      <button class="btn hidden" id="btnClose" type="button">回到聊天室看今日運勢</button>
+    </div>
+
+    <div class="card" id="delCard">
+      <button class="btn ghost" id="btnDel" type="button">刪除我的資料</button>
+      <div id="delConfirm" class="confirm hidden">確定要刪除生辰與命盤資料嗎？刪除後無法復原。
+        <div class="row"><button type="button" id="delNo">取消</button><button type="button" class="danger" id="delYes">確定刪除</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+(function(){
+  'use strict';
+  /* ======= 部署時修改這兩個值 ======= */
+  var LIFF_ID = 'REPLACE_WITH_LIFF_ID';
+  var API = 'https://fortune-line.kftseng2oo1.workers.dev';
+  /* ================================== */
+
+  var idToken = null, busy = false;
+
+  function $(id){ return document.getElementById(id); }
+  function opt(sel, a, b, cur, fmt){
+    var h = '';
+    for (var i = a; i <= b; i++) h += '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + fmt(i) + '</option>';
+    sel.innerHTML = h;
+  }
+  function lunarDayName(i){
+    var n = '一二三四五六七八九十'.split('');
+    if (i <= 10) return '初' + n[i-1];
+    if (i < 20) return '十' + n[i-11];
+    if (i === 20) return '二十';
+    if (i < 30) return '廿' + n[i-21];
+    return '三十';
+  }
+  function segVal(id){ var b = $(id).getElementsByTagName('button'); for (var i = 0; i < b.length; i++) if (b[i].className === 'on') return b[i].getAttribute('data-v'); return null; }
+  function segSet(id, v){ var b = $(id).getElementsByTagName('button'); for (var i = 0; i < b.length; i++) b[i].className = (b[i].getAttribute('data-v') === String(v)) ? 'on' : ''; }
+  function bindSeg(id, cb){
+    var b = $(id).getElementsByTagName('button');
+    for (var i = 0; i < b.length; i++) b[i].addEventListener('click', function(){ segSet(id, this.getAttribute('data-v')); if (cb) cb(this.getAttribute('data-v')); });
+  }
+  function fillDays(cur){
+    var y = +$('fY').value, m = +$('fM').value, lunar = segVal('segCal') === 'lunar';
+    var max = lunar ? 30 : new Date(Date.UTC(y, m, 0)).getUTCDate();
+    var c = cur || +$('fD').value || 1; if (c > max) c = max;
+    opt($('fD'), 1, max, c, function(i){ return lunar ? lunarDayName(i) : i + '日'; });
+  }
+  function show(el, on){ var e = $(el); e.className = on ? e.className.replace(/\s*hidden/g, '') : (e.className.indexOf('hidden') >= 0 ? e.className : e.className + ' hidden'); }
+  function msg(text, ok){ var r = $('result'); r.textContent = text; r.className = 'msg ' + (ok ? 'ok' : 'err'); }
+
+  function initForm(){
+    opt($('fY'), 1901, 2099, 1985, function(i){ return i + '年'; });
+    opt($('fM'), 1, 12, 6, function(i){ return i + '月'; });
+    fillDays(15);
+    $('fY').addEventListener('change', function(){ fillDays(); });
+    $('fM').addEventListener('change', function(){ fillDays(); });
+    $('fConsent').addEventListener('change', function(){ $('btnSave').disabled = !this.checked; });
+    bindSeg('segGender');
+    bindSeg('segBlood');
+    bindSeg('segCal', function(v){ show('leapWrap', v === 'lunar'); fillDays(); });
+  }
+  function readForm(){
+    return {
+      gender: segVal('segGender'), blood: segVal('segBlood') || '', cal: segVal('segCal'), leap: segVal('segCal') === 'lunar' && $('fLeap').checked,
+      y: +$('fY').value, m: +$('fM').value, d: +$('fD').value, hour: +$('fHour').value
+    };
+  }
+  function writeForm(b){
+    segSet('segGender', b.gender); segSet('segBlood', b.blood || ''); segSet('segCal', b.cal);
+    show('leapWrap', b.cal === 'lunar'); $('fLeap').checked = !!b.leap;
+    $('fY').value = b.y; $('fM').value = b.m; fillDays(b.d); $('fD').value = b.d;
+    if (b.hour != null) $('fHour').value = b.hour;
+    /* 已同意過的用戶直接勾選 */
+    $('fConsent').checked = true; $('btnSave').disabled = false;
+  }
+
+  function post(path, body, cb){
+    var x = new XMLHttpRequest();
+    x.open('POST', API + path, true);
+    x.setRequestHeader('Content-Type', 'application/json');
+    x.onreadystatechange = function(){
+      if (x.readyState !== 4) return;
+      var j = null; try { j = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status === 200 && j && j.ok) cb(null, j); else cb((j && j.error) || ('連線失敗（' + x.status + '）'));
+    };
+    x.send(JSON.stringify(body));
+  }
+
+  function save(){
+    if (busy) return;
+    busy = true; $('btnSave').disabled = true; $('btnSave').textContent = '排盤中…';
+    post('/api/profile', { idToken: idToken, consent: $('fConsent').checked, birth: readForm() }, function(err, j){
+      busy = false; $('btnSave').disabled = false; $('btnSave').textContent = '儲存並排盤';
+      if (err) return msg(err, false);
+      msg('已儲存！\n' + j.summary, true);
+      show('btnClose', true);
+    });
+  }
+  function del(){
+    if (busy) return;
+    busy = true;
+    post('/api/delete', { idToken: idToken }, function(err){
+      busy = false; show('delConfirm', false);
+      if (err) return msg(err, false);
+      msg('已刪除你的資料。', true);
+    });
+  }
+
+  function start(){
+    initForm();
+    $('btnSave').addEventListener('click', save);
+    $('btnDel').addEventListener('click', function(){ show('delConfirm', true); });
+    $('delNo').addEventListener('click', function(){ show('delConfirm', false); });
+    $('delYes').addEventListener('click', del);
+    $('btnClose').addEventListener('click', function(){ if (liff.isInClient()) liff.closeWindow(); else location.href = 'https://line.me/R/'; });
+
+    liff.init({ liffId: LIFF_ID }).then(function(){
+      if (!liff.isLoggedIn()){ liff.login({ redirectUri: location.href }); return; }
+      idToken = liff.getIDToken();
+      if (!idToken){ $('loading').textContent = '無法取得 LINE 登入資訊，請從 LINE 聊天室重新開啟。'; return; }
+      post('/api/me', { idToken: idToken }, function(err, j){
+        show('loading', false); show('form', true);
+        if (!err && j.birth) writeForm(j.birth);
+        else if (err) msg(err, false);
+      });
+    }).catch(function(e){
+      $('loading').textContent = 'LINE 初始化失敗：' + (e && e.message || e);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
+</script>
+</body>
+</html>

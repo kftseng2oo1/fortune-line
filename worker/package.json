@@ -1,0 +1,19 @@
+{
+  "name": "fortune-line",
+  "version": "1.0.0",
+  "description": "每日命盤運勢 LINE Bot",
+  "scripts": {
+    "test": "node ../test/webhook-sim.mjs",
+    "parity": "node ../test/engine-parity.mjs",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "parity-astro": "node ../test/astro-parity.mjs"
+  },
+  "dependencies": {
+    "lunar-javascript": "^1.7.7"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
+  },
+  "type": "module"
+}

@@ -1,0 +1,29 @@
+name = "fortune-line"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# 每日命盤運勢 LINE Bot ── 階段一（免費版 MVP）・紫微斗數（z1 引擎）
+# 部署前請依 README 建立 KV、填入 LIFF_ID 等設定，並用 wrangler secret 設定機密值。
+
+[[kv_namespaces]]
+binding = "FORTUNE_KV"
+id = "REPLACE_WITH_KV_ID"   # npx wrangler kv namespace create FORTUNE_KV 之後貼上
+
+# 經 Service Binding 呼叫 arcar（同帳號 Worker 互叫用這個最穩）
+# service 名稱要和 Cloudflare 後台的 arcar Worker 名稱一致
+[[services]]
+binding = "ARCAR"
+service = "arcar"
+
+[vars]
+LIFF_ID = "REPLACE_WITH_LIFF_ID"                 # 例：2001234567-AbCdEfGh
+LINE_LOGIN_CHANNEL_ID = "REPLACE_WITH_LOGIN_CHANNEL_ID"  # LIFF 所屬 LINE Login channel 的 Channel ID
+ALLOWED_ORIGINS = "https://kftseng2oo1.github.io"
+PRIVACY_URL = "https://kftseng2oo1.github.io/fortune-line/privacy.html"
+ZIWEI_APP_URL = "https://kftseng2oo1.github.io/z1/"
+ASTRO_APP_URL = "https://kftseng2oo1.github.io/astro/"
+AI_MODEL = "claude-haiku-5-5"
+
+# 機密值（不寫在這裡）：
+#   npx wrangler secret put LINE_CHANNEL_SECRET
+#   npx wrangler secret put LINE_CHANNEL_ACCESS_TOKEN
