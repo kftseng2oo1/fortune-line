@@ -1,6 +1,7 @@
 name = "fortune-line"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+preview_urls = false   # 不需要每個版本的預覽網址
 
 # 每日命盤運勢 LINE Bot ── 階段一（免費版 MVP）・紫微斗數（z1 引擎）
 # 部署前請依 README 建立 KV、填入 LIFF_ID 等設定，並用 wrangler secret 設定機密值。
