@@ -16,8 +16,8 @@ binding = "ARCAR"
 service = "arcar"
 
 [vars]
-LIFF_ID = "REPLACE_WITH_LIFF_ID"                 # 例：2001234567-AbCdEfGh
-LINE_LOGIN_CHANNEL_ID = "REPLACE_WITH_LOGIN_CHANNEL_ID"  # LIFF 所屬 LINE Login channel 的 Channel ID
+LIFF_ID = "2012141348-mz11FXRB"
+LINE_LOGIN_CHANNEL_ID = "2012141348"  # LIFF 所屬 LINE Login channel（fortuneline）的 Channel ID
 ALLOWED_ORIGINS = "https://kftseng2oo1.github.io"
 PRIVACY_URL = "https://kftseng2oo1.github.io/fortune-line/privacy.html"
 ZIWEI_APP_URL = "https://kftseng2oo1.github.io/z1/"
