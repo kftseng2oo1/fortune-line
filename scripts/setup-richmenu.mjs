@@ -13,10 +13,15 @@ async function ask(q) {
   rl.close();
   return a.trim();
 }
+const looksLikeToken = t => /^[A-Za-z0-9+/=._-]{100,}$/.test(t);
 let TOKEN = (process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
+if (TOKEN && !looksLikeToken(TOKEN)) {
+  console.log('（環境變數 LINE_CHANNEL_ACCESS_TOKEN 的內容不是有效的 token，改為直接詢問）');
+  TOKEN = '';
+}
 if (!TOKEN) TOKEN = await ask('貼上 Channel access token 後按 Enter：');
 const LIFF_ID = (process.env.LIFF_ID || '2012141348-mz11FXRB').trim();
-if (!/^[A-Za-z0-9+/=._-]{100,}$/.test(TOKEN)) {
+if (!looksLikeToken(TOKEN)) {
   console.error('這不像 access token：它應該是一長串英數字（約 170 字元），不含中文或空白。');
   console.error('請到 LINE Developers → 每日命盤運勢 → Messaging API 分頁最下方複製 Channel access token (long-lived)。');
   process.exit(1);
