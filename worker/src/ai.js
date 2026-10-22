@@ -62,13 +62,14 @@ function tagged(raw, tag) {
   return all.length ? all[all.length - 1][1].trim() : null;
 }
 /* 看起來像在複述指示或規劃的句子 */
-const META = /(\d+\s*(到|-|～|~)\s*\d+\s*(個)?字|繁體|台灣用語|星座名稱|不要|不提|規則|要求|需要一句|輸出|標籤|思考|規劃|這句話|小語|短評|讀者|用戶|語氣)/;
+/* 只在 AI 沒用標籤時才拿來過濾；只列「複述指示」才會出現的詞，避免誤殺正常建議（例如「不要急」） */
+const META = /(\d+\s*(到|-|～|~)\s*\d+\s*(個)?字|繁體|台灣用語|星座名稱|Markdown|標籤|思考過程|規劃|需要一句|這句話|心靈小語|短評|讀者)/;
 
 export function cleanReading(raw) {
   const inTag = tagged(raw, 'r');
   let t = inTag !== null ? inTag : String(raw || '').split(/\n+/).filter(l => !META.test(l)).join('');
   t = t.replace(/<\/?[a-z]+>/g, '').replace(/[#*`>]/g, '').replace(/\s*\n+\s*/g, '').trim();
-  if (META.test(t)) return '';
+  if (inTag === null && META.test(t)) return '';
   if (t.length > 160) {
     const cut = t.lastIndexOf('。', 150);
     t = cut > 40 ? t.slice(0, cut + 1) : t.slice(0, 150) + '…';
@@ -80,9 +81,10 @@ export function cleanReading(raw) {
 export function pickQuote(raw) {
   const inTag = tagged(raw, 'q');
   if (inTag !== null) raw = inTag;
+  const trusted = inTag !== null;          /* 標籤內是 AI 明確給的答案，不再做複述過濾 */
   const strip = l => l.replace(/^[\s\-*•>#\d.、)）]+/, '').replace(/[*`#]/g, '').trim().replace(/^[「『"“]+|[」』"”]+$/g, '').trim();
   const lines = String(raw || '').split(/\n+/).map(strip).filter(Boolean);
-  const ok = l => l.length >= 8 && l.length <= 60 && /[\u4e00-\u9fff]/.test(l) && !/[:：]$/.test(l) && !/^(以下|這是|好的|今日心靈小語|心靈小語)/.test(l) && !META.test(l);
+  const ok = l => l.length >= 8 && l.length <= 60 && /[\u4e00-\u9fff]/.test(l) && !/[:：]$/.test(l) && !/^(以下|這是|好的|今日心靈小語|心靈小語)/.test(l) && (trusted || !META.test(l));
   /* 心靈小語只要一句：每行取到第一個句號為止（後面常是 AI 自己加的說明） */
   const first = l => { const m = l.match(/^.+?[。！？!?]/); return m ? m[0] : l; };
   for (const l of lines) {
