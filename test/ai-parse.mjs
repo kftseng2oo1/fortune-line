@@ -33,4 +33,12 @@ assert.match(errs.join('\n'), /stop_reason=max_tokens/);
 assert.match(errs.join('\n'), /內容種類=thinking/);
 assert.equal(kv.size, 0, '備用句不寫入快取');
 
+// 模型把規劃寫在正文裡（實際發生過）：不能被當成答案
+assert.equal(pickQuote('需要一句話，18到32字，繁體中文，溫暖具體，不提星座名稱，帶風象的輕盈與流動感。'), null);
+assert.equal(pickQuote('需要一句話，18到32字，繁體中文，溫暖具體。\n<q>把心放輕一點，今天的風會帶你看見新的可能。</q>'), '把心放輕一點，今天的風會帶你看見新的可能。');
+assert.equal(pickQuote('<q>先寫一句</q>\n修正：\n<q>慢慢來沒關係，今天把一件小事做好就很棒。</q>'), '慢慢來沒關係，今天把一件小事做好就很棒。');
+assert.equal(pickQuote('規劃：要溫暖、不提星座名稱。\n把心放輕一點，今天的風會帶你看見新的可能。'), '把心放輕一點，今天的風會帶你看見新的可能。');
+assert.equal(cleanReading('先想想：要 60 到 90 字、繁體。\n<r>今天流日走到子女宮，紫微七殺坐守，適合把力氣放在帶領團隊上。</r>'), '今天流日走到子女宮，紫微七殺坐守，適合把力氣放在帶領團隊上。');
+assert.equal(cleanReading('要寫 60 到 90 字的短評，繁體中文，不要條列。'), '');
+
 console.log('AI 回覆整理：all checks passed');
