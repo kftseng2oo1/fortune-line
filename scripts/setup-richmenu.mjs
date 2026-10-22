@@ -7,11 +7,41 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
+/* 詢問 token，輸入時只顯示 *，避免 token 出現在畫面或截圖裡 */
 async function ask(q) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const a = await rl.question(q);
-  rl.close();
-  return a.trim();
+  const stdin = process.stdin;
+  if (!stdin.isTTY) {                       /* 非互動（例如用管線輸入）就直接讀一行 */
+    const rl = readline.createInterface({ input: stdin });
+    const line = await new Promise(res => rl.once('line', res));
+    rl.close();
+    return String(line || '').trim();
+  }
+  stdin.setRawMode(true);                   /* 先關掉終端機回顯，再印提示 */
+  stdin.setEncoding('utf8');
+  stdin.resume();
+  process.stdout.write(q);
+  return new Promise(resolve => {
+    let buf = '';
+    const onData = chunk => {
+      for (const ch of chunk) {
+        if (ch === '\r' || ch === '\n') {
+          stdin.setRawMode(false); stdin.pause(); stdin.removeListener('data', onData);
+          process.stdout.write('\n');
+          resolve(buf.trim());
+          return;
+        }
+        if (ch === '\u0003') { process.stdout.write('\n'); process.exit(130); }   /* Ctrl+C */
+        if (ch === '\u007f' || ch === '\b') {                                      /* 退格 */
+          if (buf.length) { buf = buf.slice(0, -1); process.stdout.write('\b \b'); }
+          continue;
+        }
+        if (ch < ' ') continue;
+        buf += ch;
+        process.stdout.write('*');
+      }
+    };
+    stdin.on('data', onData);
+  });
 }
 const looksLikeToken = t => /^[A-Za-z0-9+/=._-]{100,}$/.test(t);
 let TOKEN = (process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
