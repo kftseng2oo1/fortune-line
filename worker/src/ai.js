@@ -23,27 +23,56 @@ function describe(f) {
   return lines.join('\n');
 }
 
-async function callAI(env, user, system = SYSTEM, maxTokens = 300) {
+/* 呼叫 AI，回傳原始文字（保留換行，由呼叫端整理）
+ * max_tokens 給足：若 arcar 或模型啟用了「思考」，太小的上限會在寫出正文前就用完 */
+async function callAI(env, user, system = SYSTEM, maxTokens = 1024) {
   const body = JSON.stringify({
     model: env.AI_MODEL || 'claude-haiku-5-5',
-    max_tokens: maxTokens,
+    max_tokens: Math.max(maxTokens, Number(env.AI_MAX_TOKENS || 0)),
     system,
     messages: [{ role: 'user', content: user }]
   });
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), Number(env.AI_TIMEOUT_MS || 12000));
+  const timer = setTimeout(() => ctrl.abort(), Number(env.AI_TIMEOUT_MS || 20000));
   try {
     const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: ctrl.signal };
     /* 同帳號 Worker 互叫用 Service Binding，避免 workers.dev 同區域請求被擋 */
     const r = env.ARCAR ? await env.ARCAR.fetch('https://arcar/', init) : await fetch(env.AI_URL || 'https://arcar.kftseng2oo1.workers.dev', init);
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || !Array.isArray(j.content)) throw new Error('AI HTTP ' + r.status + ' ' + JSON.stringify(j && j.error || j).slice(0, 200));
-    const txt = j.content.filter(c => c.type === 'text').map(c => c.text).join('').trim();
-    if (!txt) throw new Error('AI 回傳空白');
-    return txt.replace(/[#*`>]/g, '').replace(/\s*\n+\s*/g, '');
+    const txt = j.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    if (!txt) {
+      throw new Error('AI 回傳空白｜model=' + (j.model || '?') + '｜stop_reason=' + (j.stop_reason || '?')
+        + '｜內容種類=' + (j.content.map(c => c.type).join(',') || '無') + '｜usage=' + JSON.stringify(j.usage || {}));
+    }
+    return txt;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/* 解讀：去掉 Markdown、合併成一段；太長就在句號處截斷 */
+export function cleanReading(raw) {
+  let t = String(raw || '').replace(/[#*`>]/g, '').replace(/\s*\n+\s*/g, '').trim();
+  if (t.length > 160) {
+    const cut = t.lastIndexOf('。', 150);
+    t = cut > 40 ? t.slice(0, cut + 1) : t.slice(0, 150) + '…';
+  }
+  return t;
+}
+
+/* 心靈小語：AI 偶爾會附上說明或多句，挑出真正那一句 */
+export function pickQuote(raw) {
+  const strip = l => l.replace(/^[\s\-*•>#\d.、)）]+/, '').replace(/[*`#]/g, '').trim().replace(/^[「『"“]+|[」』"”]+$/g, '').trim();
+  const lines = String(raw || '').split(/\n+/).map(strip).filter(Boolean);
+  const ok = l => l.length >= 8 && l.length <= 60 && /[\u4e00-\u9fff]/.test(l) && !/[:：]$/.test(l) && !/^(以下|這是|好的|今日心靈小語|心靈小語)/.test(l);
+  /* 心靈小語只要一句：每行取到第一個句號為止（後面常是 AI 自己加的說明） */
+  const first = l => { const m = l.match(/^.+?[。！？!?]/); return m ? m[0] : l; };
+  for (const l of lines) {
+    const q = first(l);
+    if (ok(q)) return q;
+  }
+  return null;
 }
 
 export async function getReading(env, date, features) {
@@ -51,7 +80,8 @@ export async function getReading(env, date, features) {
   const cached = await env.FORTUNE_KV.get(key);
   if (cached) return { text: cached, cached: true };
   try {
-    const text = await callAI(env, describe(features));
+    const text = cleanReading(await callAI(env, describe(features), SYSTEM, 1024));
+    if (!text) throw new Error('AI 解讀整理後為空白');
     await env.FORTUNE_KV.put(key, text, { expirationTtl: 172800 });
     return { text, cached: false };
   } catch (e) {
@@ -79,8 +109,9 @@ export async function getQuote(env, date, sign) {
   try {
     const yesterday = await env.FORTUNE_KV.get('quote:' + prevDate(date) + ':' + sign.k);
     const user = '日期：' + date + '\n對象：' + sign.n + '（' + sign.elName + '）' + (yesterday ? '\n昨天的句子（請換不同角度）：' + yesterday : '');
-    const text = (await callAI(env, user, QUOTE_SYSTEM, 120)).replace(/^[「『"]|[」』"]$/g, '');
-    if (text.length > 60) throw new Error('心靈小語太長');
+    const raw = await callAI(env, user, QUOTE_SYSTEM, 600);
+    const text = pickQuote(raw);
+    if (!text) throw new Error('心靈小語格式不符｜AI 原文：' + raw.replace(/\s+/g, ' ').slice(0, 120));
     await env.FORTUNE_KV.put(key, text, { expirationTtl: 172800 });
     return { text, cached: false };
   } catch (e) {
