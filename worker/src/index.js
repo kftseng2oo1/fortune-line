@@ -167,11 +167,13 @@ export default {
     if (url.pathname === '/webhook' && req.method === 'POST') {
       const body = await req.text();
       if (!(await verifySignature(env.LINE_CHANNEL_SECRET, body, req.headers.get('x-line-signature')))) {
+        console.warn('簽章驗證失敗：LINE_CHANNEL_SECRET 和送出訊息的官方帳號不符（請到該帳號的 Basic settings 複製 Channel secret 重新設定）');
         return new Response('bad signature', { status: 401 });
       }
       let events = [];
       try { events = JSON.parse(body).events || []; } catch (e) { return new Response('bad json', { status: 400 }); }
       /* 先回 200 給 LINE，事件在背景處理 */
+      if (events.length) console.log('收到 ' + events.length + ' 個事件：' + events.map(e => e.type + (e.postback ? '(' + e.postback.data + ')' : e.message && e.message.type === 'text' ? '(' + e.message.text.slice(0, 20) + ')' : '')).join('、'));
       ctx.waitUntil(Promise.all(events.map(ev => handleEvent(env, ev).catch(e => console.error('event error', e && e.stack || e)))));
       return new Response('ok');
     }

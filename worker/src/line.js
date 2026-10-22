@@ -27,6 +27,7 @@ export async function reply(env, replyToken, messages) {
     body: JSON.stringify({ replyToken, messages: messages.slice(0, 5) })
   });
   if (!r.ok) console.error('reply failed', r.status, await r.text());
+  else console.log('已回覆 ' + messages.length + ' 則訊息');
   return r.ok;
 }
 
