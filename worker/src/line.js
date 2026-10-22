@@ -33,6 +33,23 @@ export async function reply(env, replyToken, messages) {
 
 export const liffUrl = env => 'https://liff.line.me/' + env.LIFF_ID;
 
+/* 長輩友善：Flex 卡片無法用手指縮放（LINE 的限制），所以
+ * 1. 卡片用最寬的 giga 尺寸
+ * 2. 所有字級往上調一級
+ * 3. 開啟 scaling：文字會跟著 LINE「設定 → 聊天 → 字型大小」一起放大 */
+const SIZE_UP = { xxs: 'xs', xs: 'sm', sm: 'md', md: 'lg', lg: 'xl', xl: 'xxl', xxl: '3xl' };
+export function largePrint(node) {
+  if (Array.isArray(node)) { node.forEach(largePrint); return node; }
+  if (!node || typeof node !== 'object') return node;
+  if (node.type === 'bubble') node.size = 'giga';
+  if (node.type === 'text' || node.type === 'button') {
+    node.scaling = true;
+    if (node.type === 'text') node.size = SIZE_UP[node.size || 'md'] || node.size;
+  }
+  for (const k of ['contents', 'header', 'body', 'footer', 'hero']) if (node[k]) largePrint(node[k]);
+  return node;
+}
+
 export function text(t, quick) {
   const m = { type: 'text', text: t };
   if (quick) m.quickReply = { items: quick };
@@ -59,7 +76,8 @@ function row(label, value) {
 
 /* 今日運勢卡片 */
 export function fortuneFlex(env, { daily, features, reading, colors, hua, astro, quote }) {
-  const huaText = ['祿', '權', '科', '忌'].map(k => k + ' ' + hua[k].star + (hua[k].palace ? '→' + hua[k].palace.replace('宮', '') : '')).join('　');
+  const huaOne = k => k + ' ' + hua[k].star + (hua[k].palace ? '→' + hua[k].palace.replace('宮', '') : '');
+  const huaText = huaOne('祿') + '　' + huaOne('權') + '\n' + huaOne('科') + '　' + huaOne('忌');   /* 固定兩行，字放大後不會斷在中間 */
   const [y, m, d] = daily.date.split('-').map(Number);
   const wd = WEEK[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   const s = features.stars;
@@ -105,8 +123,8 @@ export function fortuneFlex(env, { daily, features, reading, colors, hua, astro,
       }
   };
   const altText = m + '/' + d + ' 今日運勢 ' + starText + '：' + reading.slice(0, 40);
-  if (!astro) return { type: 'flex', altText, contents: ziweiBubble };
-  return { type: 'flex', altText, contents: { type: 'carousel', contents: [ziweiBubble, astroBubble(env, astro, quote)] } };
+  if (!astro) return { type: 'flex', altText, contents: largePrint(ziweiBubble) };
+  return { type: 'flex', altText, contents: largePrint({ type: 'carousel', contents: [ziweiBubble, astroBubble(env, astro, quote)] }) };
 }
 
 /* 星座 4 顆星以上的分項 = 今日幸運面向，用來替紫微「加分」，而不是互相矛盾 */
@@ -166,7 +184,7 @@ export function setupFlex(env, title, body) {
   return {
     type: 'flex',
     altText: title,
-    contents: {
+    contents: largePrint({
       type: 'bubble',
       body: {
         type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '20px', contents: [
@@ -179,7 +197,7 @@ export function setupFlex(env, title, body) {
           { type: 'button', style: 'primary', color: '#8E6B2F', action: { type: 'uri', label: '輸入生辰', uri: liffUrl(env) } }
         ]
       }
-    }
+    })
   };
 }
 
