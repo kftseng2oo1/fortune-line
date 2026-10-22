@@ -23,7 +23,7 @@ export async function verifySignature(secret, body, signature) {
 export async function reply(env, replyToken, messages) {
   const r = await fetch(API + '/message/reply', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.LINE_CHANNEL_ACCESS_TOKEN },
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + String(env.LINE_CHANNEL_ACCESS_TOKEN || '').trim() },
     body: JSON.stringify({ replyToken, messages: messages.slice(0, 5) })
   });
   if (!r.ok) console.error('reply failed', r.status, await r.text());

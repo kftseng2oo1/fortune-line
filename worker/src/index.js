@@ -166,8 +166,12 @@ export default {
     const url = new URL(req.url);
     if (url.pathname === '/webhook' && req.method === 'POST') {
       const body = await req.text();
-      if (!(await verifySignature(env.LINE_CHANNEL_SECRET, body, req.headers.get('x-line-signature')))) {
-        console.warn('簽章驗證失敗：LINE_CHANNEL_SECRET 和送出訊息的官方帳號不符（請到該帳號的 Basic settings 複製 Channel secret 重新設定）');
+      const secret = String(env.LINE_CHANNEL_SECRET || '').trim();
+      if (!(await verifySignature(secret, body, req.headers.get('x-line-signature')))) {
+        let dest = '?';
+        try { dest = JSON.parse(body).destination || '?'; } catch (e) {}
+        console.warn('簽章驗證失敗：LINE_CHANNEL_SECRET 和送出訊息的官方帳號不符（請到該帳號的 Basic settings 複製 Channel secret 重新設定）'
+          + '｜送出帳號 destination=' + dest + '｜目前 secret 長度 ' + secret.length + '（正確應為 32）');
         return new Response('bad signature', { status: 401 });
       }
       let events = [];
