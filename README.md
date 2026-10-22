@@ -101,7 +101,7 @@ LIFF 頁就是本 repo 根目錄的 `index.html`、`privacy.html`（已附 `.noj
 
 ```bash
 cd scripts
-LINE_CHANNEL_ACCESS_TOKEN=你的token LIFF_ID=你的LIFF_ID node setup-richmenu.mjs
+node setup-richmenu.mjs        # 會詢問 access token，貼上後按 Enter
 ```
 
 想改圖片：編輯 `make-richmenu.py` 後執行 `python3 make-richmenu.py richmenu.png`，再跑一次上面的指令（舊選單會自動刪除）。

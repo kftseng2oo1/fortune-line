@@ -1,14 +1,24 @@
 // 建立圖文選單、上傳圖片、設為所有用戶的預設選單
-// 用法（Node 18+）：
-//   LINE_CHANNEL_ACCESS_TOKEN=xxx LIFF_ID=2001234567-AbCdEfGh node setup-richmenu.mjs
+// 用法（Node 18+）：在 scripts 資料夾執行  node setup-richmenu.mjs
+// 會詢問 Channel access token（每日命盤運勢 → Messaging API 分頁最下方）
+// 也可以先設環境變數 LINE_CHANNEL_ACCESS_TOKEN、LIFF_ID 跳過詢問
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
-const TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-const LIFF_ID = process.env.LIFF_ID;
-if (!TOKEN || !LIFF_ID) {
-  console.error('請設定環境變數 LINE_CHANNEL_ACCESS_TOKEN 與 LIFF_ID');
+async function ask(q) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const a = await rl.question(q);
+  rl.close();
+  return a.trim();
+}
+let TOKEN = (process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
+if (!TOKEN) TOKEN = await ask('貼上 Channel access token 後按 Enter：');
+const LIFF_ID = (process.env.LIFF_ID || '2012141348-mz11FXRB').trim();
+if (!/^[A-Za-z0-9+/=._-]{100,}$/.test(TOKEN)) {
+  console.error('這不像 access token：它應該是一長串英數字（約 170 字元），不含中文或空白。');
+  console.error('請到 LINE Developers → 每日命盤運勢 → Messaging API 分頁最下方複製 Channel access token (long-lived)。');
   process.exit(1);
 }
 const here = path.dirname(fileURLToPath(import.meta.url));
