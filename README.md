@@ -18,16 +18,19 @@ worker/            Cloudflare Worker（webhook、排盤、AI 解讀、LIFF API�
   src/astro-engine.js  星座運勢與每日一句（由 astro index.html 自動抽出，勿手改）
   src/astro.js     星座卡：分項星等、月亮星座、血型提示
   src/ai.js        經 arcar 呼叫 AI，結果快取在 KV
+  src/iching.js    易經卜卦：三數起卦、抽牌、變卦
+  src/iching-data.js   64 卦 384 爻資料（由數位易經 App 自動抽出，勿手改）
   src/line.js      簽章驗證、Reply、Flex 卡片
   wrangler.toml
 index.html         LIFF 生辰輸入頁（ES5、無 alert/confirm），由 GitHub Pages 發佈
 privacy.html       隱私政策
 scripts/
-  richmenu.png         圖文選單圖片（2500×843，四格）
+  richmenu.png         圖文選單圖片（2500×1686，2 列 × 3 格）
   make-richmenu.py     重新產生圖片
   setup-richmenu.mjs   建立並套用圖文選單
   extract-ziwei.py     從 z1 重新抽出安星引擎
   extract-astro.py     從 Astro 重新抽出星座運勢
+  extract-iching.mjs   從數位易經 App 重新抽出卦爻資料
   make-icon.py         產生 assets/ 裡的圖示
 assets/
   icon-1024.png        LINE Login channel 的 App icon
@@ -146,6 +149,7 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 - **大字顯示**：LINE 的 Flex 卡片不能用手指縮放，所以卡片用最寬的 giga 尺寸、字級都上調一級，並開啟 `scaling`，文字會跟著 LINE「設定 → 聊天 → 字型大小」一起放大。
 - **星座加分**：星座卡有 5 顆星的分項時，紫微卡多一列「星座加分・今日幸運：愛情、事業」，星座卡該項也標「今日幸運」。最多兩項，約三分之一的日子會出現；把兩套系統的差異變成互補，而不是互相矛盾。
 - **血型不知道**：分數取四種血型的平均，標題不顯示血型。
+- **易經卜卦**：選類別（事業、愛情、財運等 8 類）→ 打三個數字或按「幫我抽三張牌」→ 回覆卦卡（本卦、動爻、爻辭、該類別的白話指引、變卦）。起卦法同數位易經：第一個數字 ÷8 定上卦，第二、三個數字相加 ÷8 定下卦，三數相加 ÷6 定動爻。爻辭與解讀直接取自 App 資料庫，不呼叫 AI、不需要生辰；選好的類別暫存在 KV `iching:{userId}`，10 分鐘後失效。
 - **心靈小語**：每天每個星座由 AI 寫一句、所有同星座的人共用（一天最多 12 次呼叫），會參考昨天的句子避免重複；AI 失敗時改用 Astro 的 365 句句庫（同一年內每天不重複）。送給 AI 的只有日期與星座，不含任何個人資料。
 
 ## KV 資料
@@ -155,6 +159,7 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 | `user:{lineUserId}` | 生辰（含血型）、命盤、方案（free）、同意時間、是否封鎖 |
 | `reading:{YYYY-MM-DD}:{hash}` | AI 解讀文字，TTL 2 天 |
 | `quote:{YYYY-MM-DD}:{星座}` | 心靈小語，TTL 2 天 |
+| `iching:{lineUserId}` | 卜卦已選的類別，等使用者輸入數字，TTL 10 分鐘 |
 
 ## 下一步：階段二（付費推播）
 

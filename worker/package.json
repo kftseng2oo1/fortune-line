@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "每日命盤運勢 LINE Bot",
   "scripts": {
-    "test": "node ../test/webhook-sim.mjs && node ../test/ai-parse.mjs",
+    "test": "node ../test/webhook-sim.mjs && node ../test/ai-parse.mjs && node ../test/iching.mjs",
     "parity": "node ../test/engine-parity.mjs",
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",

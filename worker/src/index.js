@@ -5,14 +5,17 @@
  *   POST /api/me         LIFF 讀回已存的生辰（修改用）
  *   POST /api/delete     LIFF 刪除資料
  *   GET  /               健康檢查
+ * 易經卜卦：選類別 → 輸入三個數字或抽三張牌 → 回覆卦卡（資料取自數位易經 App，不呼叫 AI）
  * 免費版所有回覆都走 Reply API，不消耗官方帳號的推播額度。 */
 import { normalizeBirth, computeChart, chartSummary, toSolar } from './ziwei.js';
 import { astroToday, signFor } from './astro.js';
 import { taipeiDate, dailyInfo, dayFeatures } from './daily.js';
 import { getReading, getQuote } from './ai.js';
-import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete } from './line.js';
+import { cast, drawCards, parseDigits, looksLikeDigits, CAT_NAME } from './iching.js';
+import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick } from './line.js';
 
 const USER = id => 'user:' + id;
+const ICHING = id => 'iching:' + id;   /* 選好類別、等使用者輸入數字（10 分鐘內有效） */
 const ENGINE_VERSION = 2; // 2 = 紫微（z1 引擎）
 
 /* ---------- 共用 ---------- */
@@ -63,7 +66,30 @@ export async function buildToday(env, user, date) {
 }
 
 /* ---------- Webhook 事件 ---------- */
-async function handleAction(env, userId, replyToken, action) {
+async function handleAction(env, userId, replyToken, action, p) {
+  p = p || new URLSearchParams();
+  if (action === 'iching') {
+    await env.FORTUNE_KV.delete(ICHING(userId));
+    return reply(env, replyToken, [text('🔮 易經卜卦\n先靜下心，在心中默念想問的事情，再選擇類別：', ichingCatQuick())]);
+  }
+  if (action === 'iching_cat') {
+    const cat = p.get('cat');
+    if (!CAT_NAME[cat]) return handleAction(env, userId, replyToken, 'iching');
+    const digits = parseDigits(p.get('n'));
+    if (digits) return reply(env, replyToken, [ichingFlex(cast(digits, cat))]);
+    await env.FORTUNE_KV.put(ICHING(userId), cat, { expirationTtl: 600 });
+    return reply(env, replyToken, [text(
+      '問「' + CAT_NAME[cat] + '」。\n心中想著這件事，憑直覺打三個數字，例如 528（第一個數字不能是 0）。\n\n不想自己想數字，就按下方「幫我抽三張牌」。',
+      [qr('🃏 幫我抽三張牌', 'action=iching_draw&cat=' + cat, '幫我抽三張牌'), qr('換類別', 'action=iching', '易經卜卦')]
+    )]);
+  }
+  if (action === 'iching_draw') {
+    const cat = p.get('cat');
+    if (!CAT_NAME[cat]) return handleAction(env, userId, replyToken, 'iching');
+    await env.FORTUNE_KV.delete(ICHING(userId));
+    const cards = drawCards();
+    return reply(env, replyToken, [ichingFlex(cast(cards.map(c => c.digit), cat), cards)]);
+  }
   if (action === 'today') {
     const user = await loadUser(env, userId);
     if (!user) return reply(env, replyToken, [setupFlex(env, '先設定你的生辰', '輸入一次出生年月日與時辰，之後每天點「今日運勢」就能看到依你命盤算出的運勢。')]);
@@ -90,6 +116,7 @@ async function handleAction(env, userId, replyToken, action) {
 }
 
 const KEYWORDS = [
+  [/易經|卜卦|占卜|問卦|起卦/, 'iching'],
   [/今日運勢|今天運勢|運勢/, 'today'],
   [/我的命盤|命盤|紫微/, 'chart'],
   [/刪除.*資料/, 'delete_ask'],
@@ -116,15 +143,30 @@ export async function handleEvent(env, ev) {
     return;
   }
   if (ev.type === 'postback') {
-    const action = new URLSearchParams(ev.postback.data || '').get('action');
-    return handleAction(env, userId, ev.replyToken, action);
+    const p = new URLSearchParams(ev.postback.data || '');
+    return handleAction(env, userId, ev.replyToken, p.get('action'), p);
   }
   if (ev.type === 'message' && ev.message.type === 'text') {
     const t = ev.message.text.trim();
+    if (looksLikeDigits(t)) return handleDigits(env, userId, ev.replyToken, t);
     if (/設定生日|修改生日|輸入生辰|生日/.test(t)) return reply(env, ev.replyToken, [setupFlex(env, '設定生辰', '點下方按鈕輸入或修改你的出生資料。')]);
     for (const [re, action] of KEYWORDS) if (re.test(t)) return handleAction(env, userId, ev.replyToken, action);
     return reply(env, ev.replyToken, [text('我是你的每日運勢小幫手，請從下方選擇：', menuQuick(env))]);
   }
+}
+
+/* 使用者打了數字：已選類別就直接起卦；還沒選就請他選類別（數字帶在按鈕裡，不必再打一次） */
+async function handleDigits(env, userId, replyToken, t) {
+  const digits = parseDigits(t);
+  const cat = await env.FORTUNE_KV.get(ICHING(userId));
+  if (!digits) {
+    return reply(env, replyToken, [text('卜卦請打三個數字，例如 528，第一個數字不能是 0。', cat
+      ? [qr('🃏 幫我抽三張牌', 'action=iching_draw&cat=' + cat, '幫我抽三張牌'), qr('換類別', 'action=iching', '易經卜卦')]
+      : [qr('易經卜卦', 'action=iching')])]);
+  }
+  if (!cat) return reply(env, replyToken, [text('想用 ' + digits.join('') + ' 問哪一類的事？', ichingCatQuick(digits.join('')))]);
+  await env.FORTUNE_KV.delete(ICHING(userId));
+  return reply(env, replyToken, [ichingFlex(cast(digits, cat))]);
 }
 
 /* ---------- LIFF API ---------- */

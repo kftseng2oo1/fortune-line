@@ -59,7 +59,7 @@ export const qr = (label, data, displayText) => ({ type: 'action', action: { typ
 export const qrUri = (label, uri) => ({ type: 'action', action: { type: 'uri', label, uri } });
 
 export function menuQuick(env) {
-  return [qr('今日運勢', 'action=today'), qr('我的命盤', 'action=chart'), qrUri('設定生日', liffUrl(env)), qr('資料與隱私', 'action=privacy')];
+  return [qr('今日運勢', 'action=today'), qr('易經卜卦', 'action=iching'), qr('我的命盤', 'action=chart'), qrUri('設定生日', liffUrl(env)), qr('資料與隱私', 'action=privacy')];
 }
 
 const STAR_COLOR = { 5: '#C0392B', 4: '#D35400', 3: '#8E7A3E', 2: '#5D6D7E', 1: '#4A5568' };
@@ -213,5 +213,82 @@ export function confirmDelete() {
         { type: 'postback', label: '取消', data: 'action=delete_no', displayText: '取消' }
       ]
     }
+  };
+}
+
+/* ---------- 易經卜卦 ---------- */
+const ICHING_CATS = [['career', '事業'], ['love', '愛情'], ['wealth', '財運'], ['health', '健康'], ['marriage', '婚姻'], ['investment', '投資'], ['property', '購屋'], ['lawsuit', '官司']];
+/* 選類別；n 有值代表使用者已先打了三個數字 */
+export function ichingCatQuick(n) {
+  return ICHING_CATS.map(([k, name]) => qr(name, 'action=iching_cat&cat=' + k + (n ? '&n=' + n : ''), '問' + name));
+}
+
+const TONE = { good: '#B03A2E', neutral: '#8E6B2F', bad: '#4A5568' };
+/* 卦象圖：由上往下畫六爻，陽爻一長條、陰爻中間斷開，動爻用紅色並標「動」 */
+function hexGraphic(lines, moving) {
+  const rows = [];
+  for (let i = 5; i >= 0; i--) {
+    const color = i === moving - 1 ? '#C0392B' : '#3A2E1F';
+    const bar = () => ({ type: 'box', layout: 'vertical', contents: [], backgroundColor: color, height: '11px', flex: 1, cornerRadius: '2px' });
+    rows.push({
+      type: 'box', layout: 'horizontal', alignItems: 'center', spacing: 'sm', contents: [
+        { type: 'box', layout: 'horizontal', width: '84px', contents: lines[i] ? [bar()] : [bar(), { type: 'box', layout: 'vertical', contents: [], width: '14px', flex: 0 }, bar()] },
+        { type: 'text', text: '動', size: 'xxs', color: i === moving - 1 ? '#C0392B' : '#FFFFFF00', weight: 'bold', flex: 0 }
+      ]
+    });
+  }
+  return { type: 'box', layout: 'vertical', spacing: 'sm', flex: 0, justifyContent: 'center', contents: rows };
+}
+
+export function ichingFlex(r, cards) {
+  const how = cards ? '抽牌 ' + cards.map(c => c.label).join('　') : '數字 ' + r.digits.join('・');
+  const color = TONE[r.tone];
+  return {
+    type: 'flex',
+    altText: '易經卜卦・' + r.catName + '：' + r.name + ' ' + r.yao.name + '（' + r.judge + '）',
+    contents: largePrint({
+      type: 'bubble',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: '#23304A', paddingAll: '16px', contents: [
+          { type: 'text', text: '易經卜卦・問' + r.catName, size: 'xxs', color: '#E9D9B4', weight: 'bold' },
+          { type: 'text', text: how, size: 'xs', color: '#FFFFFF', margin: 'sm', wrap: true }
+        ]
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px', contents: [
+          {
+            type: 'box', layout: 'horizontal', spacing: 'xl', contents: [
+              hexGraphic(r.lines, r.moving),
+              {
+                type: 'box', layout: 'vertical', spacing: 'xs', justifyContent: 'center', contents: [
+                  { type: 'text', text: r.name, size: 'xl', weight: 'bold', color: '#3A2E1F', wrap: true },
+                  { type: 'text', text: '第 ' + r.id + ' 卦・' + r.yao.name + '動', size: 'xs', color: '#8C7B5E' },
+                  { type: 'text', text: '上' + r.upper.n + r.upper.img + '　下' + r.lower.n + r.lower.img, size: 'xs', color: '#8C7B5E' },
+                  { type: 'text', text: r.judge + '・' + r.score + ' 分', size: 'md', weight: 'bold', color, margin: 'sm' }
+                ]
+              }
+            ]
+          },
+          {
+            type: 'box', layout: 'vertical', paddingAll: '12px', backgroundColor: '#FBF6EC', cornerRadius: '10px', margin: 'lg', contents: [
+              { type: 'text', text: '爻辭・' + r.yao.name, size: 'xxs', color: '#8E6B2F', weight: 'bold' },
+              { type: 'text', text: r.yao.text, size: 'md', color: '#3A2E1F', wrap: true, margin: 'sm', lineSpacing: '6px' }
+            ]
+          },
+          { type: 'text', text: '對「' + r.catName + '」的指引', size: 'xs', color: '#8E6B2F', weight: 'bold', margin: 'lg' },
+          { type: 'text', text: r.guide, size: 'md', color: '#333333', wrap: true, lineSpacing: '6px' },
+          { type: 'separator', margin: 'lg' },
+          row('變卦', r.changed.name + '（事情後續的走向）'),
+          ...(r.yao.keywords.length ? [row('關鍵字', r.yao.keywords.join('、'))] : []),
+          { type: 'text', text: '同一件事不宜短時間內反覆占卜。結果僅供參考，不構成醫療、投資或法律建議。', size: 'xxs', color: '#AAAAAA', wrap: true, margin: 'lg' }
+        ]
+      },
+      footer: {
+        type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+          { type: 'button', style: 'secondary', height: 'sm', action: { type: 'postback', label: '再問一件事', data: 'action=iching', displayText: '易經卜卦' } },
+          { type: 'button', style: 'link', height: 'sm', action: { type: 'postback', label: '今日運勢', data: 'action=today', displayText: '今日運勢' } }
+        ]
+      }
+    })
   };
 }

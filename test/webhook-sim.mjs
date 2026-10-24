@@ -160,4 +160,27 @@ assert.deepEqual(luckyCats(mk([5, 5, 5, 3])).map(c => c.n), ['事業', '財運']
 assert.deepEqual(luckyCats(mk([4, 4, 4, 4])), []);
 assert.deepEqual(luckyCats(null), []);
 
-console.log('webhook simulation: all 12 checks passed');
+// 13. 易經卜卦：選類別 → 打數字；抽牌；先打數字再選類別；不需要生辰、不呼叫 AI
+const ai0 = aiCalls, kv0 = kv.size;
+await webhook([ev('message', { message: { type: 'text', text: '我想卜卦' } })]);
+assert.equal(lastReply()[0].quickReply.items.length, 8);
+await webhook([ev('postback', { postback: { data: 'action=iching_cat&cat=love' } })]);
+assert.equal(kv.get('iching:U_test_user'), 'love');
+await webhook([ev('message', { message: { type: 'text', text: '102' } })]);
+let ic = JSON.stringify(lastReply()[0]);
+assert.match(ic, /天澤履/); assert.match(ic, /問愛情/); assert.match(ic, /乾為天/); assert.match(ic, /數字 1・0・2/);
+assert.ok(!kv.has('iching:U_test_user'), '起卦後清掉待輸入狀態');
+await webhook([ev('message', { message: { type: 'text', text: '528' } })]);
+assert.match(lastReply()[0].text, /想用 528 問哪一類/);
+await webhook([ev('postback', { postback: { data: lastReply()[0].quickReply.items[2].action.data } })]);
+assert.match(lastReply()[0].altText, /易經卜卦・財運/);
+await webhook([ev('postback', { postback: { data: 'action=iching_draw&cat=career' } })]);
+assert.match(JSON.stringify(lastReply()[0]), /抽牌 [♠♥♦♣]/);
+await webhook([ev('postback', { postback: { data: 'action=iching_cat&cat=health' } })]);
+await webhook([ev('message', { message: { type: 'text', text: '028' } })]);
+assert.match(lastReply()[0].text, /第一個數字不能是 0/);
+assert.equal(aiCalls, ai0, '卜卦不呼叫 AI');
+assert.ok(!kv.has('user:U_test_user'));
+kv.delete('iching:U_test_user'); assert.equal(kv.size, kv0);
+
+console.log('webhook simulation: all 13 checks passed');

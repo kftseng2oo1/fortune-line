@@ -58,19 +58,27 @@ if (!looksLikeToken(TOKEN)) {
 }
 const here = path.dirname(fileURLToPath(import.meta.url));
 const auth = { Authorization: 'Bearer ' + TOKEN };
-const W = 2500, H = 843, CW = W / 4;
-const area = (i, action) => ({ bounds: { x: Math.round(i * CW), y: 0, width: Math.round(CW), height: H }, action });
+const W = 2500, H = 1686, COLS = 3, ROWS = 2, CW = W / COLS, RH = H / ROWS;
+const BASIC_ID = (process.env.LINE_BASIC_ID || '@110pbzay').trim();
+/* 第 i 格（由左上往右數）；最右一欄補足寬度，避免 2500/3 的小數造成縫隙 */
+const area = (i, action) => {
+  const c = i % COLS, r = Math.floor(i / COLS);
+  const x = Math.round(c * CW), y = Math.round(r * RH);
+  return { bounds: { x, y, width: Math.round((c + 1) * CW) - x, height: Math.round((r + 1) * RH) - y }, action };
+};
 
 const menu = {
   size: { width: W, height: H },
   selected: true,
-  name: 'fortune-main-v1',
+  name: 'fortune-main-v2',
   chatBarText: '運勢選單',
   areas: [
     area(0, { type: 'postback', data: 'action=today', displayText: '今日運勢' }),
-    area(1, { type: 'postback', data: 'action=chart', displayText: '我的命盤' }),
-    area(2, { type: 'uri', uri: 'https://liff.line.me/' + LIFF_ID }),
-    area(3, { type: 'postback', data: 'action=privacy', displayText: '資料與隱私' })
+    area(1, { type: 'postback', data: 'action=iching', displayText: '易經卜卦' }),
+    area(2, { type: 'postback', data: 'action=chart', displayText: '我的命盤' }),
+    area(3, { type: 'uri', uri: 'https://liff.line.me/' + LIFF_ID }),
+    area(4, { type: 'uri', uri: 'https://line.me/R/nv/recommendOA/' + BASIC_ID }),
+    area(5, { type: 'postback', data: 'action=privacy', displayText: '資料與隱私' })
   ]
 };
 
