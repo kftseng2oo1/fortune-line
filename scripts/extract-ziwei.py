@@ -38,4 +38,29 @@ out = '\n'.join([
 ])
 dst = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'worker', 'src', 'ziwei-engine.js')
 open(dst, 'w', encoding='utf-8').write(out)
+
+# 5. 人格全方位分析（六維雷達、格局基調、優勢盲點）：整段搬運 analyzePersonality 與它用到的輔助函式
+def func(name):
+    a = src.index('function ' + name + '(')
+    b = src.index('\n}\n', a) + 3
+    return src[a:b]
+bright = between('const MF_BRIGHT', 'const MF_DOMAIN')
+persona = between('const PS_DIMS', '// 六維雷達圖')
+if 'function analyzePersonality' not in persona:
+    sys.exit('抽取失敗：找不到 analyzePersonality')
+helpers = '\n'.join(func(n) for n in ['palaceByDz', 'findStarInPalaces', 'computeFly', 'detectSelfTrans'])
+out2 = '\n'.join([
+    '/* 自動產生，請勿手動修改。來源：kftseng2oo1/z1 index.html 的「人格全方位分析」',
+    ' * 重新產生：python3 scripts/extract-ziwei.py <z1 的 index.html> */',
+    "import { SIHUA, SH_KEYS } from './ziwei-engine.js';",
+    'let chartData = null;',
+    helpers, bright, persona,
+    '/* chart = calculateChart() 的原始結果 */',
+    'export function personalityOf(chart) { chartData = chart; try { return analyzePersonality(); } finally { chartData = null; } }',
+    'export { PS_DIMS, psKeyword };',
+    ''
+])
+dst2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'worker', 'src', 'ziwei-personality.js')
+open(dst2, 'w', encoding='utf-8').write(out2)
+print('寫入', dst2)
 print('wrote', os.path.normpath(dst), len(out), 'chars')

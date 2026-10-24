@@ -7,12 +7,13 @@
  *   GET  /               健康檢查
  * 易經卜卦：選類別 → 輸入三個數字或抽三張牌 → 回覆卦卡（資料取自數位易經 App，不呼叫 AI）
  * 免費版所有回覆都走 Reply API，不消耗官方帳號的推播額度。 */
-import { normalizeBirth, computeChart, chartSummary, toSolar } from './ziwei.js';
+import { normalizeBirth, computeChart, chartSummary, chartFacts, personaOf, toSolar } from './ziwei.js';
+import { radarPng, parseDims } from './radar.js';
 import { astroToday, signFor } from './astro.js';
 import { taipeiDate, dailyInfo, dayFeatures } from './daily.js';
 import { getReading, getQuote } from './ai.js';
 import { cast, drawCards, parseDigits, looksLikeDigits, CAT_NAME } from './iching.js';
-import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick } from './line.js';
+import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl } from './line.js';
 
 const USER = id => 'user:' + id;
 const ICHING = id => 'iching:' + id;   /* 選好類別、等使用者輸入數字（10 分鐘內有效） */
@@ -98,7 +99,9 @@ async function handleAction(env, userId, replyToken, action, p) {
   if (action === 'chart') {
     const user = await loadUser(env, userId);
     if (!user) return reply(env, replyToken, [setupFlex(env, '還沒有你的命盤', '先輸入生辰，我就能幫你排出紫微命盤。')]);
-    return reply(env, replyToken, [text(fullSummary(user), [qrUri('修改生日', liffUrl(env)), qr('今日運勢', 'action=today')])]);
+    const sign = signFor(toSolar(user.birth));
+    const signText = sign.g + ' ' + sign.n + (user.birth.blood ? '・' + user.birth.blood + ' 型' : '（血型未填）');
+    return reply(env, replyToken, [personaFlex(env, personaOf(user.birth), chartFacts(user.chart), signText)]);
   }
   if (action === 'privacy') {
     return reply(env, replyToken, [text(
@@ -189,7 +192,8 @@ async function apiProfile(env, body) {
     updatedAt: now
   };
   await env.FORTUNE_KV.put(USER(userId), JSON.stringify(user));
-  return { ok: true, summary: fullSummary(user) };
+  const persona = personaOf(birth);
+  return { ok: true, summary: fullSummary(user), persona: { headline: persona.headline, pattern: persona.pattern, radar: radarUrl(env, persona.dims) } };
 }
 async function apiMe(env, body) {
   const userId = await verifyIdToken(env, body.idToken);
@@ -200,6 +204,20 @@ async function apiDelete(env, body) {
   const userId = await verifyIdToken(env, body.idToken);
   await env.FORTUNE_KV.delete(USER(userId));
   return { ok: true };
+}
+
+/* 雷達圖 PNG：同一組分數只畫一次（約 15 ms CPU），之後從 KV 取 */
+async function radarResponse(env, path) {
+  const m = path.match(/^\/radar\/([0-9-]+)\.png$/);
+  const dims = m && parseDims(m[1]);
+  if (!dims) return new Response('not found', { status: 404 });
+  const key = 'radar:v1:' + dims.join('-');
+  let png = await env.FORTUNE_KV.get(key, 'arrayBuffer');
+  if (!png) {
+    png = await radarPng(dims);
+    await env.FORTUNE_KV.put(key, png);
+  }
+  return new Response(png, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' } });
 }
 
 /* ---------- 入口 ---------- */
@@ -238,6 +256,7 @@ export default {
         return json({ ok: false, error: e.message || String(e) }, 400, h);
       }
     }
+    if (url.pathname.startsWith('/radar/') && req.method === 'GET') return radarResponse(env, url.pathname);
     if (url.pathname === '/' && req.method === 'GET') return new Response('fortune bot ok');
     return new Response('not found', { status: 404 });
   }

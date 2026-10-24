@@ -91,6 +91,7 @@ assert.match((await api('/api/profile', { idToken: 'good-token', consent: true, 
 // 5. 正常存檔
 const saved = await api('/api/profile', { idToken: 'good-token', consent: true, birth });
 assert.equal(saved.status, 200);
+assert.match(saved.j.persona.headline, /・/); assert.match(saved.j.persona.radar, /\/radar\/.+\.png$/);
 assert.equal(saved.cors, 'https://kftseng2oo1.github.io');
 assert.match(saved.j.summary, /你的紫微命盤/);
 assert.match(saved.j.summary, /命宮在/);
@@ -126,8 +127,22 @@ console.log('altText:', card.altText);
 
 // 8. 我的命盤、隱私、刪除確認流程
 await webhook([ev('postback', { postback: { data: 'action=chart' } })]);
-assert.match(lastReply()[0].text, /生年四化/);
-assert.match(lastReply()[0].text, /西洋星座：♊ 雙子座・O 型/);
+const pc = lastReply()[0];
+assert.equal(pc.type, 'flex'); assert.equal(pc.contents.contents.length, 2);
+const pcs = JSON.stringify(pc);
+assert.match(pcs, /紫微人格特質/); assert.match(pcs, /格局基調/); assert.match(pcs, /優勢/); assert.match(pcs, /盲點/);
+assert.match(pcs, /生年四化/); assert.match(pcs, /♊ 雙子座・O 型/); assert.match(pcs, /三層人格/);
+const radar = pc.contents.contents[0].hero.url;
+assert.match(radar, /^https:\/\/.+\/radar\/\d+-\d+-\d+-\d+-\d+-\d+\.png$/);
+// 雷達圖：第一次畫好存 KV，第二次直接取；網址不合法回 404
+const rp = new URL(radar).pathname;
+const img = await worker.fetch(new Request('https://w' + rp), env, ctx);
+assert.equal(img.headers.get('Content-Type'), 'image/png');
+const bytes = new Uint8Array(await img.arrayBuffer());
+assert.deepEqual([...bytes.slice(0, 4)], [137, 80, 78, 71]);
+assert.ok(kv.has('radar:v1:' + rp.slice(7, -4)));
+assert.equal((await worker.fetch(new Request('https://w/radar/1-2-3.png'), env, ctx)).status, 404);
+assert.equal((await worker.fetch(new Request('https://w/radar/1-2-3-4-5-500.png'), env, ctx)).status, 404);
 await webhook([ev('postback', { postback: { data: 'action=privacy' } })]);
 assert.match(lastReply()[0].text, /privacy\.html/);
 await webhook([ev('message', { message: { type: 'text', text: '刪除我的資料' } })]);

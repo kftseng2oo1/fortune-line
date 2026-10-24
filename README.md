@@ -13,7 +13,10 @@
 worker/            Cloudflare Worker（webhook、排盤、AI 解讀、LIFF API）
   src/index.js     路由與 LINE 事件處理
   src/ziwei-engine.js  安星引擎（由 z1 index.html 自動抽出，勿手改）
-  src/ziwei.js     生辰驗證、排盤包裝、命盤摘要
+  src/ziwei.js     生辰驗證、排盤包裝、命盤摘要、人格特質
+  src/ziwei-personality.js  人格全方位分析（由 z1 自動抽出，勿手改）
+  src/radar.js     六維人格雷達圖 PNG（不用套件；同分數只畫一次，存 KV）
+  src/radar-glyphs.js  雷達圖文字點陣（由 scripts/make-radar-glyphs.py 產生）
   src/daily.js     流日命宮、流日四化、星等、宜忌、盤型 hash
   src/astro-engine.js  星座運勢與每日一句（由 astro index.html 自動抽出，勿手改）
   src/astro.js     星座卡：分項星等、月亮星座、血型提示
@@ -150,6 +153,7 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 - **星座加分**：星座卡有 5 顆星的分項時，紫微卡多一列「星座加分・今日幸運：愛情、事業」，星座卡該項也標「今日幸運」。最多兩項，約三分之一的日子會出現；把兩套系統的差異變成互補，而不是互相矛盾。
 - **血型不知道**：分數取四種血型的平均，標題不顯示血型。
 - **易經卜卦**：選類別（事業、愛情、財運等 8 類）→ 打三個數字或按「幫我抽三張牌」→ 回覆卦卡（本卦、動爻、爻辭、該類別的白話指引、變卦）。起卦法同數位易經：第一個數字 ÷8 定上卦，第二、三個數字相加 ÷8 定下卦，三數相加 ÷6 定動爻。爻辭與解讀直接取自 App 資料庫，不呼叫 AI、不需要生辰；選好的類別暫存在 KV `iching:{userId}`，10 分鐘後失效。
+- **我的命盤**：兩張卡輪播。第一張「紫微人格特質」：類型標題（例：管理型・穩重包容・執著在福德）、六維雷達圖（領導、智謀、穩定、人緣、感性、行動）、格局基調、優勢與盲點，算法整段取自 z1 的「人格全方位分析」，結果與 z1 相同。第二張是命盤資料與三層人格。雷達圖由 Worker 的 `/radar/{六個分數}.png` 產生，第一次約 15 ms CPU，之後從 KV `radar:v1:` 取。LIFF 存檔後也會顯示同一張圖。
 - **心靈小語**：每天每個星座由 AI 寫一句、所有同星座的人共用（一天最多 12 次呼叫），會參考昨天的句子避免重複；AI 失敗時改用 Astro 的 365 句句庫（同一年內每天不重複）。送給 AI 的只有日期與星座，不含任何個人資料。
 
 ## KV 資料
@@ -159,6 +163,7 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 | `user:{lineUserId}` | 生辰（含血型）、命盤、方案（free）、同意時間、是否封鎖 |
 | `reading:{YYYY-MM-DD}:{hash}` | AI 解讀文字，TTL 2 天 |
 | `quote:{YYYY-MM-DD}:{星座}` | 心靈小語，TTL 2 天 |
+| `radar:v1:{六個分數}` | 雷達圖 PNG（不過期，同分數的人共用） |
 | `iching:{lineUserId}` | 卜卦已選的類別，等使用者輸入數字，TTL 10 分鐘 |
 
 ## 下一步：階段二（付費推播）

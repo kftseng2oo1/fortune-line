@@ -1,6 +1,7 @@
 /* 紫微命盤：輸入驗證與排盤包裝。安星本身全部來自 ziwei-engine.js（由 z1 原始碼自動抽出）。 */
 import lunar from 'lunar-javascript';
 import { solarToLunar, leapMonth, lunarMonthDays, leapDays, calculateChart, SIHUA, SH_KEYS, JU_NAMES_CORRECT, DI_ZHI } from './ziwei-engine.js';
+import { personalityOf, psKeyword } from './ziwei-personality.js';
 const { Lunar } = lunar;
 
 export const HOUR_NAMES = ['早子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥', '晚子'];
@@ -45,7 +46,8 @@ export function toSolar(b) {
 
 const MINOR_GOOD = ['左輔', '右弼', '文昌', '文曲', '天魁', '天鉞', '祿存', '天馬'];
 
-export function computeChart(b) {
+/* 與 z1 runChart 相同的排盤流程，回傳 calculateChart 的原始結果 */
+function rawChart(b) {
   const s = toSolar(b);
   /* 與 z1 相同：晚子時（23–24 點）日期算到隔天、時辰為子時 */
   const isLateZi = b.hour === 12;
@@ -57,7 +59,11 @@ export function computeChart(b) {
   } else {
     lu = solarToLunar(s.y, s.m, s.d);
   }
-  const c = calculateChart(lu.year, lu.month, lu.day, hr, b.gender, lu.isLeap ? 1 : 0);
+  return { lu, c: calculateChart(lu.year, lu.month, lu.day, hr, b.gender, lu.isLeap ? 1 : 0) };
+}
+
+export function computeChart(b) {
+  const { lu, c } = rawChart(b);
   /* 依地支索引存（0=子）；index 0 是命宮 */
   const palaces = c.palaces.map(p => ({
     name: p.name, gan: p.gan, dz: p.dzIdx,
@@ -80,6 +86,28 @@ export function computeChart(b) {
   };
 }
 
+/* 人格特質：六維雷達、格局基調、三層人格、優勢與盲點（演算法整段取自 z1 的「人格全方位分析」） */
+export function personaOf(b) {
+  const { c } = rawChart(b);
+  const A = personalityOf(c);
+  const P = c.palaces;
+  const kw = p => psKeyword(P, p);
+  return {
+    headline: A.headline,
+    dims: A.dims,
+    pattern: A.pattern ? { key: A.pattern.key, name: A.pattern.name, t: A.pattern.t } : null,
+    layers: [
+      ['外顯', '命宮', kw(A.ming)],
+      ['內心', '福德', kw(A.fu)],
+      ['金錢觀', '財帛', kw(A.cai)],
+      ['做事方式', '官祿', kw(A.guan)]
+    ],
+    later: A.sameShen ? '身命同宮，表裡一致，個性到中年後更鮮明' : '身宮在' + A.shen.name + '，中年後重心轉向這裡；' + kw(A.shen),
+    good: A.good.slice(0, 4).map(x => x.t),
+    flaw: A.flaw.slice(0, 3).map(x => x.t)
+  };
+}
+
 export function palaceAt(chart, dz) { return chart.palaces.find(p => p.dz === dz); }
 export function starPalace(chart, star) { return chart.palaces.find(p => p.m.concat(p.a, p.b).indexOf(star) >= 0) || null; }
 
@@ -91,6 +119,22 @@ export function mainStarsOf(chart, p) {
 }
 
 export function goodMinors(p) { return p.a.filter(s => MINOR_GOOD.indexOf(s) >= 0); }
+
+/* 「我的命盤」第二張卡用的條列資料 */
+export function chartFacts(chart, now = new Date()) {
+  const ming = palaceAt(chart, chart.mingDz), shen = palaceAt(chart, chart.shenDz);
+  const mm = mainStarsOf(chart, ming);
+  const age = now.getUTCFullYear() - chart.lunarYear + 1;
+  const dx = chart.palaces.find(p => age >= p.dx[0] && age <= p.dx[1]);
+  const huaOne = k => k + ' ' + chart.natalHua[k].star + (chart.natalHua[k].palace ? '→' + chart.natalHua[k].palace.replace('宮', '') : '');
+  return [
+    ['生辰', '農曆 ' + chart.lunarText + '・' + chart.yearGz + '年'],
+    ['命宮', DI_ZHI[ming.dz] + '宮・' + (mm.stars.join('、') || '空宮') + (mm.borrowed && mm.stars.length ? '（借對宮）' : '')],
+    ['身宮', (shen.dz === ming.dz ? '身命同宮' : DI_ZHI[shen.dz] + '・' + shen.name) + '・' + chart.ju],
+    ['生年四化', huaOne('祿') + '　' + huaOne('權') + '\n' + huaOne('科') + '　' + huaOne('忌')],
+    ['目前大限', dx ? dx.name + '（' + dx.dx[0] + '–' + dx.dx[1] + ' 歲）' : '—']
+  ];
+}
 
 export function chartSummary(chart, now = new Date()) {
   const ming = palaceAt(chart, chart.mingDz), shen = palaceAt(chart, chart.shenDz);

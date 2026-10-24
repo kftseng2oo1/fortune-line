@@ -35,6 +35,11 @@
   .consent span { flex:1; min-width:0; }
   input[type=checkbox] { accent-color:var(--accent); }
   a { color:var(--accent); }
+  .persona { margin-top:12px; padding:14px; background:#fff; border:1px solid #E8DFCC; border-radius:12px; }
+  .persona img { display:block; width:100%; max-width:340px; margin:4px auto; }
+  .ps-label { font-size:13px; color:#8E6B2F; font-weight:700; }
+  .ps-head { font-size:19px; font-weight:700; color:#7A2E24; }
+  .ps-pattern { font-weight:700; color:#8E6B2F; margin-top:6px; }
   .msg { padding:12px; border-radius:10px; font-size:15px; white-space:pre-line; margin-top:12px; }
   .msg.ok { background:#F1EADA; }
   .msg.err { background:#FBEAE8; color:var(--err); }
@@ -83,6 +88,13 @@
         <span>我同意將出生資料用於排盤與每日運勢，資料不含姓名、不提供給第三方。詳見<a id="privacyLink" href="privacy.html">隱私政策</a>。</span>
       </label>
       <button class="btn" id="btnSave" type="button" disabled>儲存並排盤</button>
+      <div id="persona" class="hidden">
+        <div class="ps-label">紫微人格特質</div>
+        <div id="psHead" class="ps-head"></div>
+        <img id="psImg" alt="六維人格雷達圖">
+        <div id="psPattern" class="ps-pattern"></div>
+        <div id="psText"></div>
+      </div>
       <div id="result" class="msg hidden"></div>
       <button class="btn hidden" id="btnClose" type="button">回到聊天室看今日運勢</button>
     </div>
@@ -134,6 +146,16 @@
     opt($('fD'), 1, max, c, function(i){ return lunar ? lunarDayName(i) : i + '日'; });
   }
   function show(el, on){ var e = $(el); e.className = on ? e.className.replace(/\s*hidden/g, '') : (e.className.indexOf('hidden') >= 0 ? e.className : e.className + ' hidden'); }
+  /* 人格特質：標題＋雷達圖（與 LINE「我的命盤」同一張圖）＋格局基調 */
+  function showPersona(p){
+    var box = $('persona');
+    if (!p) { box.className = 'hidden'; return; }
+    $('psHead').textContent = p.headline;
+    $('psImg').src = p.radar;
+    $('psPattern').textContent = p.pattern ? '◆ 格局基調：' + p.pattern.key + '（' + p.pattern.name + '）' : '';
+    $('psText').textContent = p.pattern ? p.pattern.t + '。' : '';
+    box.className = 'persona';
+  }
   function msg(text, ok){ var r = $('result'); r.textContent = text; r.className = 'msg ' + (ok ? 'ok' : 'err'); }
 
   function initForm(){
@@ -181,6 +203,7 @@
       busy = false; $('btnSave').disabled = false; $('btnSave').textContent = '儲存並排盤';
       if (err) return msg(err, false);
       msg('已儲存！\n' + j.summary, true);
+      showPersona(j.persona);
       show('btnClose', true);
     });
   }
@@ -191,6 +214,7 @@
       busy = false; show('delConfirm', false);
       if (err) return msg(err, false);
       msg('已刪除你的資料。', true);
+      showPersona(null);
     });
   }
 

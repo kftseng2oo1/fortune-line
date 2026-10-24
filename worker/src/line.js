@@ -292,3 +292,72 @@ export function ichingFlex(r, cards) {
     })
   };
 }
+
+/* ---------- 我的命盤：人格特質（雷達圖）＋命盤資料 ---------- */
+export const radarUrl = (env, dims) => (env.WORKER_URL || 'https://fortune-line.kftseng2oo1.workers.dev') + '/radar/' + dims.join('-') + '.png';
+
+export function personaFlex(env, persona, facts, signText) {
+  const bullet = (t, color) => ({ type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+    { type: 'text', text: '・', size: 'sm', color, flex: 0 },
+    { type: 'text', text: t, size: 'sm', color: '#333333', wrap: true }
+  ] });
+  const sec = (t, color) => ({ type: 'text', text: t, size: 'sm', weight: 'bold', color: color || '#8E6B2F', margin: 'lg' });
+  const personaBubble = {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: '#FBF6EC', paddingAll: '16px', contents: [
+        { type: 'text', text: '紫微人格特質', size: 'xxs', color: '#8E6B2F', weight: 'bold' },
+        { type: 'text', text: persona.headline, weight: 'bold', size: 'lg', color: '#7A2E24', wrap: true }
+      ]
+    },
+    hero: { type: 'image', url: radarUrl(env, persona.dims), size: 'full', aspectRatio: '220:228', aspectMode: 'fit', backgroundColor: '#FFFFFF' },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px', contents: [
+        ...(persona.pattern ? [
+          { type: 'text', text: '◆ 格局基調：' + persona.pattern.key + '（' + persona.pattern.name + '）', size: 'md', weight: 'bold', color: '#8E6B2F', wrap: true },
+          { type: 'text', text: persona.pattern.t + '。', size: 'md', color: '#333333', wrap: true }
+        ] : []),
+        sec('✅ 優勢', '#2E7D4F'),
+        ...persona.good.map(t => bullet(t, '#2E7D4F')),
+        sec('⚠ 盲點', '#B03A2E'),
+        ...persona.flaw.map(t => bullet(t, '#B03A2E')),
+        { type: 'text', text: '依命宮三方四正、福德與身宮主星推算，僅供參考', size: 'xxs', color: '#AAAAAA', wrap: true, margin: 'lg' }
+      ]
+    },
+    footer: {
+      type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        { type: 'button', style: 'secondary', height: 'sm', action: { type: 'postback', label: '今日運勢', data: 'action=today', displayText: '今日運勢' } },
+        { type: 'button', style: 'link', height: 'sm', action: { type: 'uri', label: '完整排盤', uri: env.ZIWEI_APP_URL || 'https://kftseng2oo1.github.io/z1/' } }
+      ]
+    }
+  };
+  const factsBubble = {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: '#FBF6EC', paddingAll: '16px', contents: [
+        { type: 'text', text: '紫微斗數', size: 'xxs', color: '#8E6B2F', weight: 'bold' },
+        { type: 'text', text: '你的命盤', weight: 'bold', size: 'lg', color: '#3A2E1F' }
+      ]
+    },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px', contents: [
+        ...facts.map(([k, v]) => row(k, v)),
+        sec('三層人格'),
+        ...persona.layers.map(([k, where, v]) => row(k, v + '（' + where + '）')),
+        row('後天', persona.later),
+        ...(signText ? [{ type: 'separator', margin: 'lg' }, row('西洋星座', signText)] : [])
+      ]
+    },
+    footer: {
+      type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        { type: 'button', style: 'secondary', height: 'sm', action: { type: 'uri', label: '修改生日', uri: liffUrl(env) } },
+        { type: 'button', style: 'link', height: 'sm', action: { type: 'postback', label: '易經卜卦', data: 'action=iching', displayText: '易經卜卦' } }
+      ]
+    }
+  };
+  return {
+    type: 'flex',
+    altText: '你的紫微人格特質：' + persona.headline,
+    contents: largePrint({ type: 'carousel', contents: [personaBubble, factsBubble] })
+  };
+}
