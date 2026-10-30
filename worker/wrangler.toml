@@ -24,6 +24,7 @@ PRIVACY_URL = "https://kftseng2oo1.github.io/fortune-line/privacy.html"
 ZIWEI_APP_URL = "https://kftseng2oo1.github.io/z1/"
 WORKER_URL = "https://fortune-line.kftseng2oo1.workers.dev"   # 雷達圖 PNG 的公開網址前綴
 ASTRO_APP_URL = "https://kftseng2oo1.github.io/astro/"
+TAROT_APP_URL = "https://kftseng2oo1.github.io/tarot/"
 AI_MODEL = "claude-haiku-5-5"
 
 # 機密值（不寫在這裡）：

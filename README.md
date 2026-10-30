@@ -22,6 +22,8 @@ worker/            Cloudflare Worker（webhook、排盤、AI 解讀、LIFF API�
   src/astro.js     星座卡：分項星等、月亮星座、血型提示
   src/ai.js        經 arcar 呼叫 AI，結果快取在 KV
   src/iching.js    易經卜卦：三數起卦、抽牌、變卦
+  src/tarot.js     塔羅：今日一牌、聖三角
+  src/tarot-data.js    78 張牌義與牌位導讀（由塔羅秘境 App 自動抽出，勿手改）
   src/iching-data.js   64 卦 384 爻資料（由數位易經 App 自動抽出，勿手改）
   src/line.js      簽章驗證、Reply、Flex 卡片
   wrangler.toml
@@ -34,6 +36,7 @@ scripts/
   extract-ziwei.py     從 z1 重新抽出安星引擎
   extract-astro.py     從 Astro 重新抽出星座運勢
   extract-iching.mjs   從數位易經 App 重新抽出卦爻資料
+  extract-tarot.mjs    從塔羅秘境 App 重新抽出牌義（node scripts/extract-tarot.mjs ../tarot/index.html）
   make-icon.py         產生 assets/ 裡的圖示
 assets/
   icon-1024.png        LINE Login channel 的 App icon
@@ -152,6 +155,8 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 - **大字顯示**：LINE 的 Flex 卡片不能用手指縮放，所以卡片用最寬的 giga 尺寸、字級都上調一級，並開啟 `scaling`，文字會跟著 LINE「設定 → 聊天 → 字型大小」一起放大。
 - **星座加分**：星座卡有 5 顆星的分項時，紫微卡多一列「星座加分・今日幸運：愛情、事業」，星座卡該項也標「今日幸運」。最多兩項，約三分之一的日子會出現；把兩套系統的差異變成互補，而不是互相矛盾。
 - **血型不知道**：分數取四種血型的平均，標題不顯示血型。
+- **問事占卜**：圖文選單的「問事占卜」先讓使用者選易經或塔羅。
+- **塔羅**：「今日運勢」輪播第三張是「今日塔羅」，用 userId＋日期做 SHA-256 決定牌與正逆位，同一人同一天固定、不需存 KV。「塔羅三張牌」為聖三角（過去・現在・未來），選類別（感情、事業、財運、健康、整體運勢）後抽三張不重複的牌，逆位機率 1/4（同 App）；牌位導讀取自 App 的 QUESTION_CARD_FRAMES。不呼叫 AI。
 - **易經卜卦**：選類別（事業、愛情、財運等 8 類）→ 打三個數字或按「幫我抽三張牌」→ 回覆卦卡（本卦、動爻、爻辭、該類別的白話指引、變卦）。起卦法同數位易經：第一個數字 ÷8 定上卦，第二、三個數字相加 ÷8 定下卦，三數相加 ÷6 定動爻。爻辭與解讀直接取自 App 資料庫，不呼叫 AI、不需要生辰；選好的類別暫存在 KV `iching:{userId}`，10 分鐘後失效。
 - **我的命盤**：兩張卡輪播。第一張「紫微人格特質」：類型標題（例：管理型・穩重包容・執著在福德）、六維雷達圖（領導、智謀、穩定、人緣、感性、行動）、格局基調、優勢與盲點，算法整段取自 z1 的「人格全方位分析」，結果與 z1 相同。第二張是命盤資料與三層人格。雷達圖由 Worker 的 `/radar/{六個分數}.png` 產生，第一次約 15 ms CPU，之後從 KV `radar:v1:` 取。LIFF 存檔後也會顯示同一張圖。
 - **心靈小語**：每天每個星座由 AI 寫一句、所有同星座的人共用（一天最多 12 次呼叫），會參考昨天的句子避免重複；AI 失敗時改用 Astro 的 365 句句庫（同一年內每天不重複）。送給 AI 的只有日期與星座，不含任何個人資料。

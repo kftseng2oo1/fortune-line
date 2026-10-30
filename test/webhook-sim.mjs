@@ -113,7 +113,9 @@ assert.match(JSON.stringify(card), /今日運勢/);
 assert.match(JSON.stringify(card), /流日命宮在你的/);
 assert.match(JSON.stringify(card), /四化/);
 assert.equal(card.contents.type, 'carousel');
-assert.equal(card.contents.contents.length, 2);
+assert.equal(card.contents.contents.length, 3);
+const tarotCard = JSON.stringify(card.contents.contents[2]);
+assert.match(tarotCard, /今日塔羅/); assert.match(tarotCard, /[正逆]位/);
 const astroCard = JSON.stringify(card.contents.contents[1]);
 assert.match(astroCard, /西洋星座參考/);
 assert.match(astroCard, /雙子座・O 型/);
@@ -198,4 +200,21 @@ assert.equal(aiCalls, ai0, '卜卦不呼叫 AI');
 assert.ok(!kv.has('user:U_test_user'));
 kv.delete('iching:U_test_user'); assert.equal(kv.size, kv0);
 
-console.log('webhook simulation: all 13 checks passed');
+// 14. 問事占卜 → 塔羅聖三角；今日塔羅同一天固定
+await webhook([ev('message', { message: { type: 'text', text: '占卜' } })]);
+assert.deepEqual(lastReply()[0].quickReply.items.map(i => i.action.data), ['action=iching', 'action=tarot']);
+await webhook([ev('message', { message: { type: 'text', text: '我想抽塔羅' } })]);
+assert.equal(lastReply()[0].quickReply.items.length, 5);
+await webhook([ev('postback', { postback: { data: 'action=tarot_cat&cat=love' } })]);
+assert.equal(lastReply()[0].quickReply.items[0].action.data, 'action=tarot_draw&cat=love');
+await webhook([ev('postback', { postback: { data: 'action=tarot_draw&cat=love' } })]);
+const tri = lastReply()[0];
+assert.match(tri.altText, /塔羅聖三角・感情/);
+const triS = JSON.stringify(tri);
+assert.match(triS, /過去/); assert.match(triS, /現在/); assert.match(triS, /未來/); assert.match(triS, /整體提示/);
+assert.match(triS, /感情可能的走向/, '使用 App 的感情牌位導讀');
+await webhook([ev('postback', { postback: { data: 'action=tarot_draw&cat=bogus' } })]);
+assert.equal(lastReply()[0].quickReply.items.length, 5, '不明類別回到選類別');
+assert.equal(aiCalls, ai0, '塔羅不呼叫 AI');
+
+console.log('webhook simulation: all 14 checks passed');

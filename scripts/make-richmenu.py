@@ -1,5 +1,5 @@
 # 產生圖文選單圖片 2500x1686（2 列 × 3 格，每格與舊版四格一樣大）
-# 上排：今日運勢／易經卜卦／我的命盤　下排：設定生日／推薦好友／資料與隱私
+# 上排：今日運勢／問事占卜（易經・塔羅）／我的命盤　下排：設定生日／推薦好友／資料與隱私
 from PIL import Image, ImageDraw, ImageFont
 import math, sys
 W, H, COLS, ROWS = 2500, 1686, 3, 2
@@ -11,7 +11,7 @@ fT = ImageFont.truetype(serif, 92, index=3)
 fS = ImageFont.truetype(sans, 46, index=3)
 im = Image.new('RGB', (W, H), BG)
 d = ImageDraw.Draw(im)
-items = [('今日運勢', '每天一張專屬卡片'), ('易經卜卦', '心中有事問一卦'), ('我的命盤', '命宮・四化・大限'),
+items = [('今日運勢', '每天一張專屬卡片'), ('問事占卜', '易經・塔羅'), ('我的命盤', '命宮・四化・大限'),
          ('設定生日', '輸入或修改生辰'), ('推薦好友', '分享給家人朋友'), ('資料與隱私', '查看或刪除資料')]
 def sun(cx, cy):
     d.ellipse([cx-62, cy-62, cx+62, cy+62], fill=ACC)

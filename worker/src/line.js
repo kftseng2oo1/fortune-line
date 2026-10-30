@@ -59,7 +59,7 @@ export const qr = (label, data, displayText) => ({ type: 'action', action: { typ
 export const qrUri = (label, uri) => ({ type: 'action', action: { type: 'uri', label, uri } });
 
 export function menuQuick(env) {
-  return [qr('今日運勢', 'action=today'), qr('易經卜卦', 'action=iching'), qr('我的命盤', 'action=chart'), qrUri('設定生日', liffUrl(env)), qr('資料與隱私', 'action=privacy')];
+  return [qr('今日運勢', 'action=today'), qr('問事占卜', 'action=divine'), qr('我的命盤', 'action=chart'), qrUri('設定生日', liffUrl(env)), qr('資料與隱私', 'action=privacy')];
 }
 
 const STAR_COLOR = { 5: '#C0392B', 4: '#D35400', 3: '#8E7A3E', 2: '#5D6D7E', 1: '#4A5568' };
@@ -75,7 +75,7 @@ function row(label, value) {
 }
 
 /* 今日運勢卡片 */
-export function fortuneFlex(env, { daily, features, reading, colors, hua, astro, quote }) {
+export function fortuneFlex(env, { daily, features, reading, colors, hua, astro, quote, tarot }) {
   const huaOne = k => k + ' ' + hua[k].star + (hua[k].palace ? '→' + hua[k].palace.replace('宮', '') : '');
   const huaText = huaOne('祿') + '　' + huaOne('權') + '\n' + huaOne('科') + '　' + huaOne('忌');   /* 固定兩行，字放大後不會斷在中間 */
   const [y, m, d] = daily.date.split('-').map(Number);
@@ -123,8 +123,11 @@ export function fortuneFlex(env, { daily, features, reading, colors, hua, astro,
       }
   };
   const altText = m + '/' + d + ' 今日運勢 ' + starText + '：' + reading.slice(0, 40);
-  if (!astro) return { type: 'flex', altText, contents: largePrint(ziweiBubble) };
-  return { type: 'flex', altText, contents: largePrint({ type: 'carousel', contents: [ziweiBubble, astroBubble(env, astro, quote)] }) };
+  const bubbles = [ziweiBubble];
+  if (astro) bubbles.push(astroBubble(env, astro, quote));
+  if (tarot) bubbles.push(tarotBubble(env, tarot));
+  if (bubbles.length === 1) return { type: 'flex', altText, contents: largePrint(ziweiBubble) };
+  return { type: 'flex', altText, contents: largePrint({ type: 'carousel', contents: bubbles }) };
 }
 
 /* 星座 4 顆星以上的分項 = 今日幸運面向，用來替紫微「加分」，而不是互相矛盾 */
@@ -359,5 +362,115 @@ export function personaFlex(env, persona, facts, signText) {
     type: 'flex',
     altText: '你的紫微人格特質：' + persona.headline,
     contents: largePrint({ type: 'carousel', contents: [personaBubble, factsBubble] })
+  };
+}
+
+/* ---------- 塔羅 ---------- */
+const TAROT_BG = '#2A2140', TAROT_GOLD = '#E3C77A';
+const tarotAppUrl = env => env.TAROT_APP_URL || 'https://kftseng2oo1.github.io/tarot/';
+const orient = c => c.reversed ? '逆位' : '正位';
+
+/* 牌面：深紫底、羅馬數字、圖示、牌名（App 沒有牌面圖，用文字排成一張牌） */
+function cardFace(c, big) {
+  return {
+    type: 'box', layout: 'vertical', backgroundColor: TAROT_BG, cornerRadius: '10px', paddingAll: big ? '14px' : '10px',
+    width: big ? '120px' : '88px', flex: 0, borderWidth: '2px', borderColor: TAROT_GOLD, contents: [
+      { type: 'text', text: c.num, size: 'xs', color: TAROT_GOLD, align: 'center' },
+      { type: 'text', text: c.art, size: big ? '3xl' : 'xxl', align: 'center', margin: 'sm' },
+      { type: 'text', text: c.name, size: 'xs', color: '#FFFFFF', align: 'center', weight: 'bold', wrap: true, margin: 'sm' },
+      ...(c.reversed ? [{ type: 'text', text: '逆位', size: 'xxs', color: '#F2A7A0', align: 'center' }] : [])
+    ]
+  };
+}
+
+/* 今日運勢第三張：今日塔羅（每人每天固定一張） */
+export function tarotBubble(env, c) {
+  return {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: TAROT_BG, paddingAll: '16px', contents: [
+        { type: 'text', text: '今日塔羅', size: 'xxs', color: TAROT_GOLD, weight: 'bold' },
+        { type: 'text', text: c.name + '・' + orient(c), weight: 'bold', size: 'lg', color: '#FFFFFF' },
+        { type: 'text', text: c.en + '・' + c.suit, size: 'xs', color: '#C9BEDF', margin: 'sm', wrap: true }
+      ]
+    },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px', contents: [
+        {
+          type: 'box', layout: 'horizontal', spacing: 'lg', contents: [
+            cardFace(c, true),
+            {
+              type: 'box', layout: 'vertical', spacing: 'sm', justifyContent: 'center', contents: [
+                { type: 'text', text: '關鍵字', size: 'xxs', color: '#8E6B2F', weight: 'bold' },
+                { type: 'text', text: c.kw.join('、'), size: 'sm', color: '#3A2E1F', wrap: true },
+                ...(c.el || c.pl ? [{ type: 'text', text: [c.el && '元素 ' + c.el, c.pl && c.pl].filter(Boolean).join('・'), size: 'xs', color: '#8C7B5E', wrap: true, margin: 'sm' }] : [])
+              ]
+            }
+          ]
+        },
+        { type: 'text', text: c.text, size: 'md', color: '#333333', wrap: true, lineSpacing: '6px', margin: 'lg' },
+        { type: 'text', text: '每人每天固定一張，明天再來看新的一張', size: 'xxs', color: '#AAAAAA', wrap: true, margin: 'lg' }
+      ]
+    },
+    footer: {
+      type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        { type: 'button', style: 'secondary', height: 'sm', action: { type: 'postback', label: '塔羅問事', data: 'action=tarot', displayText: '塔羅三張牌' } },
+        { type: 'button', style: 'link', height: 'sm', action: { type: 'uri', label: '塔羅 App', uri: tarotAppUrl(env) } }
+      ]
+    }
+  };
+}
+
+/* 問事占卜：選易經或塔羅 */
+export function divineQuick() {
+  return [qr('☯ 易經卜卦', 'action=iching', '易經卜卦'), qr('🔮 塔羅三張牌', 'action=tarot', '塔羅三張牌')];
+}
+export function tarotCatQuick(cats) {
+  return Object.keys(cats).map(k => qr(cats[k], 'action=tarot_cat&cat=' + k, '問' + cats[k]));
+}
+
+/* 聖三角結果：三張牌並排，再逐張說明 */
+export function trinityFlex(env, r) {
+  /* 每張牌：深色牌位標籤＋牌名、牌位導讀、牌義 */
+  const labeled = c => {
+    return { type: 'box', layout: 'vertical', margin: 'lg', contents: [
+      { type: 'box', layout: 'horizontal', spacing: 'sm', alignItems: 'center', contents: [
+        { type: 'box', layout: 'vertical', backgroundColor: TAROT_BG, cornerRadius: '6px', paddingStart: '8px', paddingEnd: '8px', paddingTop: '2px', paddingBottom: '2px', flex: 0, contents: [
+          { type: 'text', text: c.pos, size: 'sm', weight: 'bold', color: TAROT_GOLD }
+        ] },
+        { type: 'text', text: c.art + ' ' + c.name + '・' + orient(c), size: 'sm', weight: 'bold', color: '#3A2E1F', wrap: true }
+      ] },
+      { type: 'text', text: c.hint, size: 'xs', color: '#8E6B2F', wrap: true, margin: 'sm' },
+      { type: 'text', text: c.text, size: 'sm', color: '#333333', wrap: true, lineSpacing: '4px', margin: 'xs' }
+    ] };
+  };
+  return {
+    type: 'flex',
+    altText: '塔羅聖三角・' + r.catName + '：' + r.cards.map(c => c.name + (c.reversed ? '（逆）' : '')).join('／'),
+    contents: largePrint({
+      type: 'bubble',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: TAROT_BG, paddingAll: '16px', contents: [
+          { type: 'text', text: '塔羅聖三角・問' + r.catName, size: 'xxs', color: TAROT_GOLD, weight: 'bold' },
+          { type: 'text', text: '過去・現在・未來', size: 'md', color: '#FFFFFF', weight: 'bold', margin: 'sm' }
+        ]
+      },
+      body: {
+        type: 'box', layout: 'vertical', paddingAll: '16px', contents: [
+          { type: 'box', layout: 'horizontal', spacing: 'sm', justifyContent: 'center', contents: r.cards.map(c => cardFace(c, false)) },
+          ...r.cards.map(labeled),
+          { type: 'separator', margin: 'xl' },
+          { type: 'text', text: '整體提示', size: 'xs', color: '#8E6B2F', weight: 'bold', margin: 'lg' },
+          ...r.summary.map(t => ({ type: 'text', text: t, size: 'sm', color: '#333333', wrap: true, margin: 'sm' })),
+          { type: 'text', text: '同一件事不宜短時間內反覆抽牌。結果僅供參考，不構成醫療、投資或法律建議。', size: 'xxs', color: '#AAAAAA', wrap: true, margin: 'lg' }
+        ]
+      },
+      footer: {
+        type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+          { type: 'button', style: 'secondary', height: 'sm', action: { type: 'postback', label: '再問一件事', data: 'action=divine', displayText: '問事占卜' } },
+          { type: 'button', style: 'link', height: 'sm', action: { type: 'uri', label: '完整牌陣', uri: tarotAppUrl(env) } }
+        ]
+      }
+    })
   };
 }

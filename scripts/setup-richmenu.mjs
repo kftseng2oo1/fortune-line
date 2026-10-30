@@ -70,11 +70,11 @@ const area = (i, action) => {
 const menu = {
   size: { width: W, height: H },
   selected: true,
-  name: 'fortune-main-v2',
+  name: 'fortune-main-v3',
   chatBarText: '運勢選單',
   areas: [
     area(0, { type: 'postback', data: 'action=today', displayText: '今日運勢' }),
-    area(1, { type: 'postback', data: 'action=iching', displayText: '易經卜卦' }),
+    area(1, { type: 'postback', data: 'action=divine', displayText: '問事占卜' }),
     area(2, { type: 'postback', data: 'action=chart', displayText: '我的命盤' }),
     area(3, { type: 'uri', uri: 'https://liff.line.me/' + LIFF_ID }),
     area(4, { type: 'uri', uri: 'https://line.me/R/nv/recommendOA/' + BASIC_ID }),

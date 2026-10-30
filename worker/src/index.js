@@ -5,7 +5,10 @@
  *   POST /api/me         LIFF 讀回已存的生辰（修改用）
  *   POST /api/delete     LIFF 刪除資料
  *   GET  /               健康檢查
- * 易經卜卦：選類別 → 輸入三個數字或抽三張牌 → 回覆卦卡（資料取自數位易經 App，不呼叫 AI）
+ * 問事占卜：先選易經或塔羅
+ *   易經卜卦：選類別 → 輸入三個數字或抽三張牌 → 回覆卦卡（資料取自數位易經 App，不呼叫 AI）
+ *   塔羅聖三角：選類別 → 抽三張牌（過去・現在・未來）→ 回覆牌卡（資料取自塔羅秘境 App，不呼叫 AI）
+ * 今日運勢：紫微＋西洋星座＋今日塔羅（每人每天固定一張）
  * 免費版所有回覆都走 Reply API，不消耗官方帳號的推播額度。 */
 import { normalizeBirth, computeChart, chartSummary, chartFacts, personaOf, toSolar } from './ziwei.js';
 import { radarPng, parseDims } from './radar.js';
@@ -13,7 +16,8 @@ import { astroToday, signFor } from './astro.js';
 import { taipeiDate, dailyInfo, dayFeatures } from './daily.js';
 import { getReading, getQuote } from './ai.js';
 import { cast, drawCards, parseDigits, looksLikeDigits, CAT_NAME } from './iching.js';
-import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl } from './line.js';
+import { dailyTarot, drawTrinity, TAROT_CATS } from './tarot.js';
+import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl, divineQuick, tarotCatQuick, trinityFlex } from './line.js';
 
 const USER = id => 'user:' + id;
 const ICHING = id => 'iching:' + id;   /* 選好類別、等使用者輸入數字（10 分鐘內有效） */
@@ -57,18 +61,38 @@ function fullSummary(user) {
 }
 
 /* ---------- 今日運勢 ---------- */
-export async function buildToday(env, user, date) {
+export async function buildToday(env, user, date, userId) {
   const daily = dailyInfo(date);
   const x = dayFeatures(user.chart, daily);
   const sign = signFor(toSolar(user.birth));
   const astro = astroToday(sign, user.birth.blood || '', date);
-  const [r, q] = await Promise.all([getReading(env, date, x.f), getQuote(env, date, astro.sign)]);
-  return fortuneFlex(env, { daily, features: x.f, reading: r.text, colors: x.color, hua: x.hua, astro, quote: q.text });
+  const [r, q, tarot] = await Promise.all([getReading(env, date, x.f), getQuote(env, date, astro.sign), userId ? dailyTarot(userId, date) : null]);
+  return fortuneFlex(env, { daily, features: x.f, reading: r.text, colors: x.color, hua: x.hua, astro, quote: q.text, tarot });
 }
 
 /* ---------- Webhook 事件 ---------- */
 async function handleAction(env, userId, replyToken, action, p) {
   p = p || new URLSearchParams();
+  if (action === 'divine') {
+    await env.FORTUNE_KV.delete(ICHING(userId));
+    return reply(env, replyToken, [text('🔮 問事占卜\n想用哪一種方式問？\n\n☯ 易經卜卦：打三個數字或抽牌起卦，看卦象與爻辭\n🔮 塔羅三張牌：過去・現在・未來', divineQuick())]);
+  }
+  if (action === 'tarot') {
+    return reply(env, replyToken, [text('🔮 塔羅三張牌（過去・現在・未來）\n先在心中想著想問的事，再選擇類別：', tarotCatQuick(TAROT_CATS))]);
+  }
+  if (action === 'tarot_cat') {
+    const cat = p.get('cat');
+    if (!TAROT_CATS[cat]) return handleAction(env, userId, replyToken, 'tarot');
+    return reply(env, replyToken, [text(
+      '問「' + TAROT_CATS[cat] + '」。\n深呼吸，心裡想著這件事，準備好了就按下方「抽三張牌」。',
+      [qr('🃏 抽三張牌', 'action=tarot_draw&cat=' + cat, '抽三張牌'), qr('換類別', 'action=tarot', '塔羅三張牌')]
+    )]);
+  }
+  if (action === 'tarot_draw') {
+    const cat = p.get('cat');
+    if (!TAROT_CATS[cat]) return handleAction(env, userId, replyToken, 'tarot');
+    return reply(env, replyToken, [trinityFlex(env, drawTrinity(cat))]);
+  }
   if (action === 'iching') {
     await env.FORTUNE_KV.delete(ICHING(userId));
     return reply(env, replyToken, [text('🔮 易經卜卦\n先靜下心，在心中默念想問的事情，再選擇類別：', ichingCatQuick())]);
@@ -94,7 +118,7 @@ async function handleAction(env, userId, replyToken, action, p) {
   if (action === 'today') {
     const user = await loadUser(env, userId);
     if (!user) return reply(env, replyToken, [setupFlex(env, '先設定你的生辰', '輸入一次出生年月日與時辰，之後每天點「今日運勢」就能看到依你命盤算出的運勢。')]);
-    return reply(env, replyToken, [await buildToday(env, user, taipeiDate())]);
+    return reply(env, replyToken, [await buildToday(env, user, taipeiDate(), userId)]);
   }
   if (action === 'chart') {
     const user = await loadUser(env, userId);
@@ -119,7 +143,9 @@ async function handleAction(env, userId, replyToken, action, p) {
 }
 
 const KEYWORDS = [
-  [/易經|卜卦|占卜|問卦|起卦/, 'iching'],
+  [/塔羅/, 'tarot'],
+  [/易經|卜卦|問卦|起卦/, 'iching'],
+  [/占卜|問事|算命/, 'divine'],
   [/今日運勢|今天運勢|運勢/, 'today'],
   [/我的命盤|命盤|紫微/, 'chart'],
   [/刪除.*資料/, 'delete_ask'],
