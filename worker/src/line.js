@@ -368,20 +368,17 @@ export function personaFlex(env, persona, facts, signText) {
 /* ---------- 塔羅 ---------- */
 const TAROT_BG = '#2A2140', TAROT_GOLD = '#E3C77A';
 const tarotAppUrl = env => env.TAROT_APP_URL || 'https://kftseng2oo1.github.io/tarot/';
-const orient = c => c.reversed ? '逆位' : '正位';
-
-/* 牌面：深紫底、羅馬數字、圖示、牌名（App 沒有牌面圖，用文字排成一張牌） */
-function cardFace(c, big) {
+/* 牌面圖：1910 年 Pam-A 原版（公有領域），放在 GitHub Pages；逆位用預先轉 180° 的圖 */
+const tarotImg = (env, c) => (env.TAROT_IMG_BASE || 'https://kftseng2oo1.github.io/fortune-line/tarot-cards/') + String(c.id).padStart(2, '0') + (c.reversed ? 'r' : '') + '.jpg';
+function cardImage(env, c, width) {
   return {
-    type: 'box', layout: 'vertical', backgroundColor: TAROT_BG, cornerRadius: '10px', paddingAll: big ? '14px' : '10px',
-    width: big ? '120px' : '88px', flex: 0, borderWidth: '2px', borderColor: TAROT_GOLD, contents: [
-      { type: 'text', text: c.num, size: 'xs', color: TAROT_GOLD, align: 'center' },
-      { type: 'text', text: c.art, size: big ? '3xl' : 'xxl', align: 'center', margin: 'sm' },
-      { type: 'text', text: c.name, size: 'xs', color: '#FFFFFF', align: 'center', weight: 'bold', wrap: true, margin: 'sm' },
-      ...(c.reversed ? [{ type: 'text', text: '逆位', size: 'xxs', color: '#F2A7A0', align: 'center' }] : [])
+    type: 'box', layout: 'vertical', width, flex: 0, spacing: 'xs', contents: [
+      { type: 'image', url: tarotImg(env, c), size: 'full', aspectRatio: '3:5', aspectMode: 'cover' },
+      { type: 'text', text: c.reversed ? c.name + '（逆）' : c.name, size: 'xxs', color: '#5A4630', align: 'center', wrap: true }
     ]
   };
 }
+const orient = c => c.reversed ? '逆位' : '正位';
 
 /* 今日運勢第三張：今日塔羅（每人每天固定一張） */
 export function tarotBubble(env, c) {
@@ -398,7 +395,7 @@ export function tarotBubble(env, c) {
       type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px', contents: [
         {
           type: 'box', layout: 'horizontal', spacing: 'lg', contents: [
-            cardFace(c, true),
+            cardImage(env, c, '120px'),
             {
               type: 'box', layout: 'vertical', spacing: 'sm', justifyContent: 'center', contents: [
                 { type: 'text', text: '關鍵字', size: 'xxs', color: '#8E6B2F', weight: 'bold' },
@@ -457,7 +454,7 @@ export function trinityFlex(env, r) {
       },
       body: {
         type: 'box', layout: 'vertical', paddingAll: '16px', contents: [
-          { type: 'box', layout: 'horizontal', spacing: 'sm', justifyContent: 'center', contents: r.cards.map(c => cardFace(c, false)) },
+          { type: 'box', layout: 'horizontal', spacing: 'sm', justifyContent: 'center', contents: r.cards.map(c => cardImage(env, c, '88px')) },
           ...r.cards.map(labeled),
           { type: 'separator', margin: 'xl' },
           { type: 'text', text: '整體提示', size: 'xs', color: '#8E6B2F', weight: 'bold', margin: 'lg' },

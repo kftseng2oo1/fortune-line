@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { dailyTarot, drawTrinity, trinitySummary, TAROT_CATS } from '../worker/src/tarot.js';
 import { CARDS } from '../worker/src/tarot-data.js';
+import fs from 'node:fs';
 
 assert.equal(CARDS.length, 78);
 assert.ok(CARDS.every(c => c.name && c.up && c.rev && c.kw.length && c.art));
@@ -32,5 +33,11 @@ for (const cat of Object.keys(TAROT_CATS)) {
 const mk = (major, reversed) => ({ major, reversed, name: 'X', kw: ['a', 'b'] });
 assert.match(trinitySummary([mk(true, true), mk(true, true), mk(false, false)]).join(''), /大阿爾克那有 2 張.*逆位有 2 張/);
 assert.match(trinitySummary([mk(false, false), mk(false, false), mk(false, false)]).join(''), /小阿爾克那.*正位/);
+
+// 4. 每張牌的正位、逆位牌面圖都在
+for (const c of CARDS) for (const r of ['', 'r']) {
+  const f = new URL('../tarot-cards/' + String(c.id).padStart(2, '0') + r + '.jpg', import.meta.url);
+  assert.ok(fs.existsSync(f), '缺少牌面圖 ' + f.pathname);
+}
 
 console.log('tarot: all checks passed（今日範例：' + a.name + (a.reversed ? '・逆位' : '・正位') + '）');
