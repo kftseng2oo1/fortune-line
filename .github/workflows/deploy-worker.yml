@@ -1,0 +1,38 @@
+# 合併到 main 且 worker/ 或 test/ 有變動時，自動測試並部署 Cloudflare Worker
+# 需要 repo Secrets：CLOUDFLARE_API_TOKEN（必填）、CLOUDFLARE_ACCOUNT_ID（帳號只有一個時可不填）
+name: Deploy Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - 'test/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:   # 也可以在 Actions 頁面手動按 Run workflow
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci
+      - name: 測試（沒過就不部署）
+        run: npm test
+      - name: 部署到 Cloudflare
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
