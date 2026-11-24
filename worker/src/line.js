@@ -87,7 +87,7 @@ function row(label, value) {
 }
 
 /* 今日運勢卡片 */
-export function fortuneFlex(env, { daily, features, reading, colors, hua, astro, quote, tarot }) {
+export function fortuneFlex(env, { daily, features, reading, colors, hua, astro, quote, tarot, dharma }) {
   const huaOne = k => k + ' ' + hua[k].star + (hua[k].palace ? '→' + hua[k].palace.replace('宮', '') : '');
   const huaText = huaOne('祿') + '　' + huaOne('權') + '\n' + huaOne('科') + '　' + huaOne('忌');   /* 固定兩行，字放大後不會斷在中間 */
   const [y, m, d] = daily.date.split('-').map(Number);
@@ -138,6 +138,7 @@ export function fortuneFlex(env, { daily, features, reading, colors, hua, astro,
   const bubbles = [ziweiBubble];
   if (astro) bubbles.push(astroBubble(env, astro, quote));
   if (tarot) bubbles.push(tarotBubble(env, tarot));
+  if (dharma) bubbles.push(dharmaBubble(env, dharma));
   if (bubbles.length === 1) return { type: 'flex', altText, contents: largePrint(ziweiBubble) };
   return { type: 'flex', altText, contents: largePrint({ type: 'carousel', contents: bubbles }) };
 }
@@ -425,6 +426,40 @@ export function tarotBubble(env, c) {
       type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
         { type: 'button', style: 'secondary', height: 'sm', action: { type: 'postback', label: '塔羅問事', data: 'action=tarot', displayText: '塔羅三張牌' } },
         { type: 'button', style: 'link', height: 'sm', action: { type: 'uri', label: '塔羅 App', uri: tarotAppUrl(env) } }
+      ]
+    }
+  };
+}
+
+/* 今日運勢第四張：今日法語（所有人同一句，經文取自古譯原典） */
+const DHARMA_BG = '#5A4632', DHARMA_GOLD = '#F0D9A8';
+export function dharmaBubble(env, x) {
+  return {
+    type: 'bubble',
+    header: {
+      type: 'box', layout: 'vertical', backgroundColor: DHARMA_BG, paddingAll: '16px', contents: [
+        { type: 'text', text: '🪔 今日法語', size: 'xxs', color: DHARMA_GOLD, weight: 'bold' },
+        { type: 'text', text: '《' + x.s.split('・')[0] + '》' + (x.s.indexOf('・') > 0 ? x.s.slice(x.s.indexOf('・')) : ''), weight: 'bold', size: 'lg', color: '#FFFFFF', wrap: true }
+      ]
+    },
+    body: {
+      type: 'box', layout: 'vertical', spacing: 'md', paddingAll: '16px', backgroundColor: '#FBF6EC', contents: [
+        { type: 'text', text: x.t, size: 'lg', weight: 'bold', color: '#5A4632', wrap: true, lineSpacing: '8px' },
+        { type: 'separator', margin: 'lg', color: '#E8DFCC' },
+        { type: 'text', text: x.b, size: 'md', color: '#333333', wrap: true, lineSpacing: '6px', margin: 'lg' },
+        {
+          type: 'box', layout: 'vertical', spacing: 'xs', margin: 'lg', paddingAll: '12px', backgroundColor: '#F1EADA', cornerRadius: '8px', contents: [
+            { type: 'text', text: '今日練習', size: 'xs', color: '#8E6B2F', weight: 'bold' },
+            { type: 'text', text: x.p, size: 'sm', color: '#3A2E1F', wrap: true }
+          ]
+        },
+        { type: 'text', text: '經文取自古譯原典，白話為意譯', size: 'xxs', color: '#AAAAAA', wrap: true, margin: 'lg' }
+      ]
+    },
+    footer: {
+      type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+        { type: 'button', style: 'secondary', height: 'sm', action: { type: 'postback', label: '問阿拉燈', data: 'action=lamp', displayText: '請教阿拉燈' } },
+        { type: 'button', style: 'link', height: 'sm', action: { type: 'uri', label: '阿拉燈 App', uri: lampAppUrl(env) } }
       ]
     }
   };

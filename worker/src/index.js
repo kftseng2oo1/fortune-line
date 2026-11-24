@@ -8,7 +8,7 @@
  * 問事占卜：先選易經或塔羅
  *   易經卜卦：選類別 → 輸入三個數字或抽三張牌 → 回覆卦卡（資料取自數位易經 App，不呼叫 AI）
  *   塔羅聖三角：選類別 → 抽三張牌（過去・現在・未來）→ 回覆牌卡（資料取自塔羅秘境 App，不呼叫 AI）
- * 今日運勢：紫微＋西洋星座＋今日塔羅（每人每天固定一張）
+ * 今日運勢：紫微＋西洋星座＋今日塔羅（每人每天固定一張）＋今日法語（所有人同一句）
  * 🪔 阿拉燈：佛法心靈導師對話模式（移植自 kftseng2oo1/buddha），從問事占卜、快速選單或關鍵字進入，
  *   對話中打的文字都交給阿拉燈；按「結束對話」、點其他功能或 30 分鐘沒說話就離開
  * 免費版所有回覆都走 Reply API，不消耗官方帳號的推播額度。 */
@@ -19,6 +19,7 @@ import { taipeiDate, dailyInfo, dayFeatures } from './daily.js';
 import { getReading, getQuote } from './ai.js';
 import { cast, drawCards, parseDigits, looksLikeDigits, CAT_NAME } from './iching.js';
 import { dailyTarot, drawTrinity, TAROT_CATS } from './tarot.js';
+import { dailyDharma } from './dharma.js';
 import { LAMP, loadSession, saveSession, askLamp, dailyLimit } from './lamp.js';
 import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl, divineQuick, tarotCatQuick, trinityFlex, loading, lampQuick } from './line.js';
 
@@ -70,7 +71,7 @@ export async function buildToday(env, user, date, userId) {
   const sign = signFor(toSolar(user.birth));
   const astro = astroToday(sign, user.birth.blood || '', date);
   const [r, q, tarot] = await Promise.all([getReading(env, date, x.f), getQuote(env, date, astro.sign), userId ? dailyTarot(userId, date) : null]);
-  return fortuneFlex(env, { daily, features: x.f, reading: r.text, colors: x.color, hua: x.hua, astro, quote: q.text, tarot });
+  return fortuneFlex(env, { daily, features: x.f, reading: r.text, colors: x.color, hua: x.hua, astro, quote: q.text, tarot, dharma: dailyDharma(date) });
 }
 
 /* ---------- Webhook 事件 ---------- */
