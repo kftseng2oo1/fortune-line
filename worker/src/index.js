@@ -9,6 +9,8 @@
  *   易經卜卦：選類別 → 輸入三個數字或抽三張牌 → 回覆卦卡（資料取自數位易經 App，不呼叫 AI）
  *   塔羅聖三角：選類別 → 抽三張牌（過去・現在・未來）→ 回覆牌卡（資料取自塔羅秘境 App，不呼叫 AI）
  * 今日運勢：紫微＋西洋星座＋今日塔羅（每人每天固定一張）
+ * 🪔 阿拉燈：佛法心靈導師對話模式（移植自 kftseng2oo1/buddha），從問事占卜、快速選單或關鍵字進入，
+ *   對話中打的文字都交給阿拉燈；按「結束對話」、點其他功能或 30 分鐘沒說話就離開
  * 免費版所有回覆都走 Reply API，不消耗官方帳號的推播額度。 */
 import { normalizeBirth, computeChart, chartSummary, chartFacts, personaOf, toSolar } from './ziwei.js';
 import { radarPng, parseDims } from './radar.js';
@@ -17,7 +19,8 @@ import { taipeiDate, dailyInfo, dayFeatures } from './daily.js';
 import { getReading, getQuote } from './ai.js';
 import { cast, drawCards, parseDigits, looksLikeDigits, CAT_NAME } from './iching.js';
 import { dailyTarot, drawTrinity, TAROT_CATS } from './tarot.js';
-import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl, divineQuick, tarotCatQuick, trinityFlex } from './line.js';
+import { MASTERS, LAMP, loadSession, saveSession, askLamp, dailyLimit } from './lamp.js';
+import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl, divineQuick, tarotCatQuick, trinityFlex, loading, lampMasterQuick, lampQuick } from './line.js';
 
 const USER = id => 'user:' + id;
 const ICHING = id => 'iching:' + id;   /* 選好類別、等使用者輸入數字（10 分鐘內有效） */
@@ -71,11 +74,48 @@ export async function buildToday(env, user, date, userId) {
 }
 
 /* ---------- Webhook 事件 ---------- */
+/* ---------- 🪔 阿拉燈 ---------- */
+const LAMP_INTRO = '🪔 阿拉燈・佛法心靈導師\n有什麼煩惱或修行上的疑問，直接打字問我就可以。\n\n也可以先選一位導師（預設是阿拉燈導師）。想離開就按「結束對話」。';
+const LAMP_END_RE = /^(結束|結束對話|離開|退出|再見|bye)$/i;
+
+async function lampAction(env, userId, replyToken, action, p) {
+  if (action === 'lamp') {
+    const s = await loadSession(env, userId);
+    if (s) return reply(env, replyToken, [text('正在和' + (MASTERS[s.m] || MASTERS.general).name + '對話中，請直接打字說說你的問題。', lampQuick())]);
+    await saveSession(env, userId, { m: 'general', h: [] });
+    return reply(env, replyToken, [text(LAMP_INTRO, lampMasterQuick(MASTERS))]);
+  }
+  if (action === 'lamp_pick') return reply(env, replyToken, [text('想請哪一位導師開示？', lampMasterQuick(MASTERS))]);
+  if (action === 'lamp_master') {
+    const m = MASTERS[p.get('m')] ? p.get('m') : 'general';
+    await saveSession(env, userId, { m, h: [] });   /* 換導師就重新開始對話 */
+    return reply(env, replyToken, [text(MASTERS[m].emoji + ' ' + MASTERS[m].name + '在此。\n請說說你心裡的事，或想問的修行問題。', lampQuick())]);
+  }
+  if (action === 'lamp_end') {
+    await env.FORTUNE_KV.delete(LAMP(userId));
+    return reply(env, replyToken, [text('🙏 感恩這段對話。願你今天心安自在，想再請教時，點「問事占卜」→「請教阿拉燈」就可以。', menuQuick(env))]);
+  }
+}
+
+async function handleLamp(env, userId, replyToken, session, t) {
+  await loading(env, userId, 40);
+  const r = await askLamp(env, userId, session, t, taipeiDate());
+  if (r.limited) {
+    return reply(env, replyToken, [text('今天已經請教阿拉燈 ' + dailyLimit(env) + ' 次了，讓心沉澱一下，明天再來聊吧 🙏\n\n若你現在很難受，請撥安心專線 1925（24 小時）。', [qr('結束對話', 'action=lamp_end'), qr('今日運勢', 'action=today')])]);
+  }
+  if (r.fallback) return reply(env, replyToken, [text('阿拉燈這會兒沒有回應，請稍後再問一次。', lampQuick())]);
+  const note = r.left !== null && r.left <= 3 ? '\n\n（今天還可以再問 ' + r.left + ' 次）' : '';
+  return reply(env, replyToken, [text(r.text + note, lampQuick())]);
+}
+
 async function handleAction(env, userId, replyToken, action, p) {
   p = p || new URLSearchParams();
+  if (action && action.indexOf('lamp') === 0) return lampAction(env, userId, replyToken, action, p);
+  /* 點了其他功能就離開阿拉燈對話，之後打字才不會被當成提問 */
+  if (await env.FORTUNE_KV.get(LAMP(userId))) await env.FORTUNE_KV.delete(LAMP(userId));
   if (action === 'divine') {
     await env.FORTUNE_KV.delete(ICHING(userId));
-    return reply(env, replyToken, [text('🔮 問事占卜\n想用哪一種方式問？\n\n☯ 易經卜卦：打三個數字或抽牌起卦，看卦象與爻辭\n🔮 塔羅三張牌：過去・現在・未來', divineQuick())]);
+    return reply(env, replyToken, [text('🔮 問事占卜\n想用哪一種方式問？\n\n☯ 易經卜卦：打三個數字或抽牌起卦，看卦象與爻辭\n🔮 塔羅三張牌：過去・現在・未來\n🪔 請教阿拉燈：和佛法心靈導師聊聊心裡的事', divineQuick())]);
   }
   if (action === 'tarot') {
     return reply(env, replyToken, [text('🔮 塔羅三張牌（過去・現在・未來）\n先在心中想著想問的事，再選擇類別：', tarotCatQuick(TAROT_CATS))]);
@@ -135,7 +175,7 @@ async function handleAction(env, userId, replyToken, action, p) {
   }
   if (action === 'delete_ask') return reply(env, replyToken, [confirmDelete()]);
   if (action === 'delete_yes') {
-    await env.FORTUNE_KV.delete(USER(userId));
+    await Promise.all([env.FORTUNE_KV.delete(USER(userId)), env.FORTUNE_KV.delete(LAMP(userId))]);
     return reply(env, replyToken, [text('已刪除你的生辰與命盤資料。若想再使用，隨時可以重新輸入生辰。')]);
   }
   if (action === 'delete_no') return reply(env, replyToken, [text('好的，資料保留不變。')]);
@@ -143,6 +183,7 @@ async function handleAction(env, userId, replyToken, action, p) {
 }
 
 const KEYWORDS = [
+  [/阿拉燈|請教師父|佛法|師父開示/, 'lamp'],
   [/塔羅/, 'tarot'],
   [/易經|卜卦|問卦|起卦/, 'iching'],
   [/占卜|問事|算命/, 'divine'],
@@ -177,6 +218,11 @@ export async function handleEvent(env, ev) {
   }
   if (ev.type === 'message' && ev.message.type === 'text') {
     const t = ev.message.text.trim();
+    const lamp = await loadSession(env, userId);
+    if (lamp) {
+      if (LAMP_END_RE.test(t)) return handleAction(env, userId, ev.replyToken, 'lamp_end');
+      return handleLamp(env, userId, ev.replyToken, lamp, t);
+    }
     if (looksLikeDigits(t)) return handleDigits(env, userId, ev.replyToken, t);
     if (/設定生日|修改生日|輸入生辰|生日/.test(t)) return reply(env, ev.replyToken, [setupFlex(env, '設定生辰', '點下方按鈕輸入或修改你的出生資料。')]);
     for (const [re, action] of KEYWORDS) if (re.test(t)) return handleAction(env, userId, ev.replyToken, action);
@@ -228,7 +274,7 @@ async function apiMe(env, body) {
 }
 async function apiDelete(env, body) {
   const userId = await verifyIdToken(env, body.idToken);
-  await env.FORTUNE_KV.delete(USER(userId));
+  await Promise.all([env.FORTUNE_KV.delete(USER(userId)), env.FORTUNE_KV.delete(LAMP(userId))]);
   return { ok: true };
 }
 

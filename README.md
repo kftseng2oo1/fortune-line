@@ -23,6 +23,7 @@ worker/            Cloudflare Worker（webhook、排盤、AI 解讀、LIFF API�
   src/ai.js        經 arcar 呼叫 AI，結果快取在 KV
   src/iching.js    易經卜卦：三數起卦、抽牌、變卦
   src/tarot.js     塔羅：今日一牌、聖三角
+  src/lamp.js      🪔 阿拉燈佛法心靈導師：導師設定、典籍檢索、危機訊號、對話暫存
   src/tarot-data.js    78 張牌義與牌位導讀（由塔羅秘境 App 自動抽出，勿手改）
   src/iching-data.js   64 卦 384 爻資料（由數位易經 App 自動抽出，勿手改）
   src/line.js      簽章驗證、Reply、Flex 卡片
@@ -124,6 +125,7 @@ node setup-richmenu.mjs        # 會詢問 access token，貼上後按 Enter
 - [ ] 點「今日運勢」收到兩張卡（紫微＋星座），第二次點會更快（命中快取）
 - [ ] 星座卡的分項星等與 Astro App 當天相同
 - [ ] 點「我的命盤」顯示命宮主星、身宮、五行局、生年四化、目前大限
+- [ ] 「問事占卜」→「請教阿拉燈」，問一題，回答引用典籍且沒有 `**`、`#`；按「結束對話」後打數字恢復成卜卦
 - [ ] 「資料與隱私」→「刪除我的資料」→ 確定，資料被刪除
 
 看即時記錄：`cd worker && npx wrangler tail`
@@ -159,6 +161,12 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 - **塔羅**：「今日運勢」輪播第三張是「今日塔羅」，用 userId＋日期做 SHA-256 決定牌與正逆位，同一人同一天固定、不需存 KV。「塔羅三張牌」為聖三角（過去・現在・未來），選類別（感情、事業、財運、健康、整體運勢）後抽三張不重複的牌，逆位機率 1/4（同 App）；牌位導讀取自 App 的 QUESTION_CARD_FRAMES。不呼叫 AI。牌面圖在 `tarot-cards/`（GitHub Pages），是 Pamela Colman Smith 1910 年 Pam-A 原版掃描（Wikimedia Commons 公有領域），由 `scripts/make-tarot-cards.py` 產生正位與逆位（轉 180°）兩種，來源逐張列在 `tarot-cards/SOURCES.md`。
 - **易經卜卦**：選類別（事業、愛情、財運等 8 類）→ 打三個數字或按「幫我抽三張牌」→ 回覆卦卡（本卦、動爻、爻辭、該類別的白話指引、變卦）。起卦法同數位易經：第一個數字 ÷8 定上卦，第二、三個數字相加 ÷8 定下卦，三數相加 ÷6 定動爻。爻辭與解讀直接取自 App 資料庫，不呼叫 AI、不需要生辰；選好的類別暫存在 KV `iching:{userId}`，10 分鐘後失效。
 - **我的命盤**：兩張卡輪播。第一張「紫微人格特質」：類型標題（例：管理型・穩重包容・執著在福德）、六維雷達圖（領導、智謀、穩定、人緣、感性、行動）、格局基調、優勢與盲點，算法整段取自 z1 的「人格全方位分析」，結果與 z1 相同。第二張是命盤資料與三層人格。雷達圖由 Worker 的 `/radar/{六個分數}.png` 產生，第一次約 15 ms CPU，之後從 KV `radar:v1:` 取。LIFF 存檔後也會顯示同一張圖。
+- **🪔 阿拉燈**：移植自 [阿拉燈心靈導師](https://kftseng2oo1.github.io/buddha/)（kftseng2oo1/buddha）。從「問事占卜」→「請教阿拉燈」、快速選單或關鍵字（阿拉燈、佛法、請教師父）進入「對話模式」，之後打的文字都交給阿拉燈回答，連數字也不會被當成卜卦；按「結束對話」、打「結束」、點任何其他功能，或 30 分鐘沒說話就離開。7 位導師（阿拉燈、南傳、禪宗、淨土、藏傳、聖嚴法師、星雲大師）沿用 App 的設定，換導師會重新開始對話。
+  - 典籍檢索：經 Service Binding `TWINKLE` 呼叫 twinklehub Worker 的 `/rag/query`（wisdom-indexer 建的智慧庫），5 秒沒回就略過；引文規則同 App，禁止編造語錄。
+  - AI：經 arcar，模型 `LAMP_MODEL`（預設 Haiku，因為 reply token 有時效，回得快比較穩），逾時 25 秒；等待時先送「輸入中」動畫（chat/loading，不計則數）。回覆去掉 Markdown，150–300 字。
+  - 每人每天 `LAMP_DAILY_LIMIT` 次（預設 10），剩 3 次以內會提示。
+  - 安全：偵測到自傷／輕生訊號時，AI 改用只接住情緒的指示、不檢索典籍，回覆固定附上 1925／1995／1980／119 專線；不受次數限制，AI 失敗也會回固定的關懷訊息。
+  - 隱私：不做 App 的長期記憶（`/memory`），只在 KV 暫存最近 3 輪，送給 AI 的只有對話文字。
 - **心靈小語**：每天每個星座由 AI 寫一句、所有同星座的人共用（一天最多 12 次呼叫），會參考昨天的句子避免重複；AI 失敗時改用 Astro 的 365 句句庫（同一年內每天不重複）。送給 AI 的只有日期與星座，不含任何個人資料。
 
 ## KV 資料
@@ -170,6 +178,8 @@ python3 ../scripts/extract-astro.py ../../astro/index.html   # 不一致時重�
 | `quote:{YYYY-MM-DD}:{星座}` | 心靈小語，TTL 2 天 |
 | `radar:v1:{六個分數}` | 雷達圖 PNG（不過期，同分數的人共用） |
 | `iching:{lineUserId}` | 卜卦已選的類別，等使用者輸入數字，TTL 10 分鐘 |
+| `lamp:{lineUserId}` | 阿拉燈對話中：導師與最近 3 輪對話，TTL 30 分鐘 |
+| `lampn:{YYYY-MM-DD}:{lineUserId}` | 當天問阿拉燈的次數，TTL 2 天 |
 
 ## 下一步：階段二（付費推播）
 
