@@ -31,6 +31,18 @@ export async function reply(env, replyToken, messages) {
   return r.ok;
 }
 
+/* 「輸入中」動畫（免費、不計則數）：AI 回答要等十幾秒，先讓使用者知道有在處理 */
+export async function loading(env, chatId, seconds) {
+  try {
+    const r = await fetch(API + '/chat/loading/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + String(env.LINE_CHANNEL_ACCESS_TOKEN || '').trim() },
+      body: JSON.stringify({ chatId, loadingSeconds: seconds || 30 })
+    });
+    if (!r.ok) console.warn('loading failed', r.status);
+  } catch (e) { console.warn('loading failed', e && e.message); }
+}
+
 export const liffUrl = env => 'https://liff.line.me/' + env.LIFF_ID;
 
 /* 長輩友善：Flex 卡片無法用手指縮放（LINE 的限制），所以
@@ -59,7 +71,7 @@ export const qr = (label, data, displayText) => ({ type: 'action', action: { typ
 export const qrUri = (label, uri) => ({ type: 'action', action: { type: 'uri', label, uri } });
 
 export function menuQuick(env) {
-  return [qr('今日運勢', 'action=today'), qr('問事占卜', 'action=divine'), qr('我的命盤', 'action=chart'), qrUri('設定生日', liffUrl(env)), qr('資料與隱私', 'action=privacy')];
+  return [qr('今日運勢', 'action=today'), qr('問事占卜', 'action=divine'), qr('🪔 阿拉燈', 'action=lamp', '請教阿拉燈'), qr('我的命盤', 'action=chart'), qrUri('設定生日', liffUrl(env)), qr('資料與隱私', 'action=privacy')];
 }
 
 const STAR_COLOR = { 5: '#C0392B', 4: '#D35400', 3: '#8E7A3E', 2: '#5D6D7E', 1: '#4A5568' };
@@ -420,7 +432,16 @@ export function tarotBubble(env, c) {
 
 /* 問事占卜：選易經或塔羅 */
 export function divineQuick() {
-  return [qr('☯ 易經卜卦', 'action=iching', '易經卜卦'), qr('🔮 塔羅三張牌', 'action=tarot', '塔羅三張牌')];
+  return [qr('☯ 易經卜卦', 'action=iching', '易經卜卦'), qr('🔮 塔羅三張牌', 'action=tarot', '塔羅三張牌'), qr('🪔 請教阿拉燈', 'action=lamp', '請教阿拉燈')];
+}
+
+/* 阿拉燈：選導師、對話中的快速回覆 */
+export function lampMasterQuick(masters) {
+  return Object.keys(masters).map(k => qr(masters[k].emoji + ' ' + masters[k].name, 'action=lamp_master&m=' + k, '請' + masters[k].name + '開示'))
+    .concat([qr('結束對話', 'action=lamp_end')]);
+}
+export function lampQuick() {
+  return [qr('結束對話', 'action=lamp_end'), qr('換導師', 'action=lamp_pick', '換導師'), qr('今日運勢', 'action=today')];
 }
 export function tarotCatQuick(cats) {
   return Object.keys(cats).map(k => qr(cats[k], 'action=tarot_cat&cat=' + k, '問' + cats[k]));

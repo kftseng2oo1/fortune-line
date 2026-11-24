@@ -32,6 +32,13 @@ const env = {
   }
 };
 let aiCalls = 0;
+const lampCalls = [], ragCalls = [], loadings = [];
+env.TWINKLE = {
+  fetch: async (url, init) => {
+    ragCalls.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ matches: [{ source: '法句經', chapter: '雙品', text: '諸法意先導，意主意造作。', tradition: 'theravada' }] }), { status: 200 });
+  }
+};
 const replies = [];
 globalThis.fetch = async (url, init) => {
   if (String(url).includes('/oauth2/v2.1/verify')) {
@@ -40,6 +47,7 @@ globalThis.fetch = async (url, init) => {
       ? new Response(JSON.stringify({ sub: 'U_test_user' }), { status: 200 })
       : new Response(JSON.stringify({ error: 'invalid' }), { status: 400 });
   }
+  if (String(url).includes('/chat/loading/start')) { loadings.push(JSON.parse(init.body)); return new Response('{}', { status: 202 }); }
   if (String(url).includes('/message/reply')) {
     replies.push(JSON.parse(init.body));
     return new Response('{}', { status: 200 });
@@ -203,7 +211,7 @@ kv.delete('iching:U_test_user'); assert.equal(kv.size, kv0);
 
 // 14. 問事占卜 → 塔羅聖三角；今日塔羅同一天固定
 await webhook([ev('message', { message: { type: 'text', text: '占卜' } })]);
-assert.deepEqual(lastReply()[0].quickReply.items.map(i => i.action.data), ['action=iching', 'action=tarot']);
+assert.deepEqual(lastReply()[0].quickReply.items.map(i => i.action.data), ['action=iching', 'action=tarot', 'action=lamp']);
 await webhook([ev('message', { message: { type: 'text', text: '我想抽塔羅' } })]);
 assert.equal(lastReply()[0].quickReply.items.length, 5);
 await webhook([ev('postback', { postback: { data: 'action=tarot_cat&cat=love' } })]);
@@ -219,4 +227,63 @@ await webhook([ev('postback', { postback: { data: 'action=tarot_draw&cat=bogus' 
 assert.equal(lastReply()[0].quickReply.items.length, 5, '不明類別回到選類別');
 assert.equal(aiCalls, ai0, '塔羅不呼叫 AI');
 
-console.log('webhook simulation: all 14 checks passed');
+
+// 15. 🪔 阿拉燈：進入對話模式 → 提問 → 換導師 → 危機訊號 → 次數上限 → 點其他功能離開
+const say = t => webhook([ev('message', { message: { type: 'text', text: t } })]);
+const kv1 = kv.size, ai1 = aiCalls;
+env.ARCAR.fetch = async (url, init) => {
+  aiCalls++;
+  const b = JSON.parse(init.body);
+  assert.match(b.system, /阿拉燈/);
+  lampCalls.push(b);
+  if (b.messages.at(-1).content.includes('故障')) return new Response('{"error":"boom"}', { status: 500 });
+  return new Response(JSON.stringify({ content: [{ type: 'text', text: '## 開示\n**煩惱**來時，先覺察呼吸。\n- 據《法句經》，心是一切的前導。\n\n（此為依法理解，請以原典與真實師父指導為準 🙏）' }] }), { status: 200 });
+};
+await webhook([ev('postback', { postback: { data: 'action=lamp' } })]);
+assert.match(lastReply()[0].text, /阿拉燈・佛法心靈導師/);
+assert.equal(lastReply()[0].quickReply.items.length, 8, '7 位導師＋結束對話');
+assert.equal(JSON.parse(kv.get('lamp:U_test_user')).m, 'general');
+await say('528');   /* 對話中打數字也是提問，不會被當成卜卦 */
+assert.equal(lampCalls.length, 1);
+assert.equal(loadings.at(-1).chatId, 'U_test_user', '先顯示輸入中動畫');
+let lr = lastReply()[0].text;
+assert.ok(!/##|\*\*/.test(lr), 'LINE 不顯示 Markdown，要去掉');
+assert.match(lr, /・據《法句經》/);
+assert.match(lampCalls[0].system, /智慧庫/); assert.match(lampCalls[0].system, /諸法意先導/);
+assert.equal(ragCalls.at(-1).query, '528');
+await say('最近工作壓力很大，晚上睡不著');
+assert.equal(lampCalls[1].messages.length, 3, '帶上一輪對話');
+assert.ok(!JSON.stringify(lampCalls[1]).includes('1985') && !JSON.stringify(lampCalls[1]).includes('U_test_user'), '不送生日或 userId');
+await webhook([ev('postback', { postback: { data: 'action=lamp_master&m=zen' } })]);
+assert.match(lastReply()[0].text, /禪師在此/);
+await say('什麼是放下');
+assert.match(lampCalls.at(-1).system, /禪宗宗師/);
+assert.equal(lampCalls.at(-1).messages.length, 1, '換導師後重新開始');
+await say('我覺得活著好累，不想活了');
+assert.match(lastReply()[0].text, /1925/); assert.match(lastReply()[0].text, /1995/);
+assert.match(lampCalls.at(-1).system, /自傷或輕生訊號/);
+assert.equal(ragCalls.at(-1).query, '什麼是放下', '危機訊號不做典籍檢索');
+await say('系統故障測試');
+assert.match(lastReply()[0].text, /沒有回應/);
+const day = Object.keys(Object.fromEntries(kv)).find(k => k.startsWith('lampn:'));
+assert.equal(kv.get(day), '3', '危機與失敗不算次數');
+kv.set(day, '10');
+await say('還想再問');
+assert.match(lastReply()[0].text, /今天已經請教阿拉燈 10 次/);
+const nLamp = lampCalls.length;
+await say('我想自殺');
+assert.equal(lampCalls.length, nLamp + 1, '危機訊號不受次數限制');
+assert.match(lastReply()[0].text, /安心專線 1925/);
+await say('結束');
+assert.match(lastReply()[0].text, /感恩這段對話/);
+assert.ok(!kv.has('lamp:U_test_user'));
+await say('阿拉燈');
+assert.ok(kv.has('lamp:U_test_user'), '關鍵字進入');
+await webhook([ev('postback', { postback: { data: 'action=divine' } })]);
+assert.ok(!kv.has('lamp:U_test_user'), '點其他功能就離開對話');
+await say('528');
+assert.match(lastReply()[0].text, /想用 528 問哪一類/, '離開後數字恢復卜卦');
+assert.equal(aiCalls - ai1, lampCalls.length, '只有阿拉燈呼叫 AI');
+kv.delete(day); assert.equal(kv.size, kv1);
+
+console.log('webhook simulation: all 15 checks passed');

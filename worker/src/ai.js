@@ -29,15 +29,16 @@ const CACHE_V = 'v2:';
 
 /* 呼叫 AI，回傳原始文字（保留換行，由呼叫端整理）
  * max_tokens 給足：若 arcar 或模型啟用了「思考」，太小的上限會在寫出正文前就用完 */
-async function callAI(env, user, system = SYSTEM, maxTokens = 1024) {
+/* user 可以是字串（單輪）或 messages 陣列（多輪，阿拉燈用）；opts.model／opts.timeoutMs 可覆寫 */
+export async function callAI(env, user, system = SYSTEM, maxTokens = 1024, opts = {}) {
   const body = JSON.stringify({
-    model: env.AI_MODEL || 'claude-haiku-5-5',
+    model: opts.model || env.AI_MODEL || 'claude-haiku-5-5',
     max_tokens: Math.max(maxTokens, Number(env.AI_MAX_TOKENS || 0)),
     system,
-    messages: [{ role: 'user', content: user }]
+    messages: Array.isArray(user) ? user : [{ role: 'user', content: user }]
   });
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), Number(env.AI_TIMEOUT_MS || 20000));
+  const timer = setTimeout(() => ctrl.abort(), Number(opts.timeoutMs || env.AI_TIMEOUT_MS || 20000));
   try {
     const init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: ctrl.signal };
     /* 同帳號 Worker 互叫用 Service Binding，避免 workers.dev 同區域請求被擋 */
