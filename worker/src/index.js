@@ -19,8 +19,8 @@ import { taipeiDate, dailyInfo, dayFeatures } from './daily.js';
 import { getReading, getQuote } from './ai.js';
 import { cast, drawCards, parseDigits, looksLikeDigits, CAT_NAME } from './iching.js';
 import { dailyTarot, drawTrinity, TAROT_CATS } from './tarot.js';
-import { MASTERS, LAMP, loadSession, saveSession, askLamp, dailyLimit } from './lamp.js';
-import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl, divineQuick, tarotCatQuick, trinityFlex, loading, lampMasterQuick, lampQuick } from './line.js';
+import { LAMP, loadSession, saveSession, askLamp, dailyLimit } from './lamp.js';
+import { verifySignature, reply, text, qr, qrUri, menuQuick, liffUrl, fortuneFlex, setupFlex, confirmDelete, ichingFlex, ichingCatQuick, personaFlex, radarUrl, divineQuick, tarotCatQuick, trinityFlex, loading, lampQuick } from './line.js';
 
 const USER = id => 'user:' + id;
 const ICHING = id => 'iching:' + id;   /* 選好類別、等使用者輸入數字（10 分鐘內有效） */
@@ -75,22 +75,18 @@ export async function buildToday(env, user, date, userId) {
 
 /* ---------- Webhook 事件 ---------- */
 /* ---------- 🪔 阿拉燈 ---------- */
-const LAMP_INTRO = '🪔 阿拉燈・佛法心靈導師\n有什麼煩惱或修行上的疑問，直接打字問我就可以。\n\n也可以先選一位導師（預設是阿拉燈導師）。想離開就按「結束對話」。';
+const LAMP_INTRO = '🪔 阿拉燈・佛法心靈導師\n有什麼煩惱或修行上的疑問，直接打字問我就可以。\n\n想請教其他上師（南傳、禪宗、淨土、藏傳、聖嚴法師、星雲大師），按「問其他上師」開啟阿拉燈 App。想離開就按「結束對話」。';
 const LAMP_END_RE = /^(結束|結束對話|離開|退出|再見|bye)$/i;
 
 async function lampAction(env, userId, replyToken, action, p) {
   if (action === 'lamp') {
     const s = await loadSession(env, userId);
-    if (s) return reply(env, replyToken, [text('正在和' + (MASTERS[s.m] || MASTERS.general).name + '對話中，請直接打字說說你的問題。', lampQuick())]);
+    if (s) return reply(env, replyToken, [text('正在和阿拉燈對話中，請直接打字說說你的問題。', lampQuick(env))]);
     await saveSession(env, userId, { m: 'general', h: [] });
-    return reply(env, replyToken, [text(LAMP_INTRO, lampMasterQuick(MASTERS))]);
+    return reply(env, replyToken, [text(LAMP_INTRO, lampQuick(env))]);
   }
-  if (action === 'lamp_pick') return reply(env, replyToken, [text('想請哪一位導師開示？', lampMasterQuick(MASTERS))]);
-  if (action === 'lamp_master') {
-    const m = MASTERS[p.get('m')] ? p.get('m') : 'general';
-    await saveSession(env, userId, { m, h: [] });   /* 換導師就重新開始對話 */
-    return reply(env, replyToken, [text(MASTERS[m].emoji + ' ' + MASTERS[m].name + '在此。\n請說說你心裡的事，或想問的修行問題。', lampQuick())]);
-  }
+  /* 舊版的「換導師」按鈕還留在聊天紀錄裡，按了就當成進入阿拉燈 */
+  if (action === 'lamp_pick' || action === 'lamp_master') return lampAction(env, userId, replyToken, 'lamp', p);
   if (action === 'lamp_end') {
     await env.FORTUNE_KV.delete(LAMP(userId));
     return reply(env, replyToken, [text('🙏 感恩這段對話。願你今天心安自在，想再請教時，點「問事占卜」→「請教阿拉燈」就可以。', menuQuick(env))]);
@@ -103,9 +99,9 @@ async function handleLamp(env, userId, replyToken, session, t) {
   if (r.limited) {
     return reply(env, replyToken, [text('今天已經請教阿拉燈 ' + dailyLimit(env) + ' 次了，讓心沉澱一下，明天再來聊吧 🙏\n\n若你現在很難受，請撥安心專線 1925（24 小時）。', [qr('結束對話', 'action=lamp_end'), qr('今日運勢', 'action=today')])]);
   }
-  if (r.fallback) return reply(env, replyToken, [text('阿拉燈這會兒沒有回應，請稍後再問一次。', lampQuick())]);
+  if (r.fallback) return reply(env, replyToken, [text('阿拉燈這會兒沒有回應，請稍後再問一次。', lampQuick(env))]);
   const note = r.left !== null && r.left <= 3 ? '\n\n（今天還可以再問 ' + r.left + ' 次）' : '';
-  return reply(env, replyToken, [text(r.text + note, lampQuick())]);
+  return reply(env, replyToken, [text(r.text + note, lampQuick(env))]);
 }
 
 async function handleAction(env, userId, replyToken, action, p) {
