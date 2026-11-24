@@ -50,7 +50,8 @@ export async function callAI(env, user, system = SYSTEM, maxTokens = 1024, opts 
       throw new Error('AI 回傳空白｜model=' + (j.model || '?') + '｜stop_reason=' + (j.stop_reason || '?')
         + '｜內容種類=' + (j.content.map(c => c.type).join(',') || '無') + '｜usage=' + JSON.stringify(j.usage || {}));
     }
-    return txt;
+    if (j.stop_reason === 'max_tokens') console.warn('AI 回覆達 max_tokens 上限被截斷｜usage=' + JSON.stringify(j.usage || {}));
+    return opts.withStop ? { text: txt, stop: j.stop_reason || '' } : txt;
   } finally {
     clearTimeout(timer);
   }

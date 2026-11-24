@@ -137,6 +137,13 @@ export function cleanLamp(raw) {
   return t;
 }
 
+/* 截到最後一個句號／問號／驚嘆號（含後面的引號括號）；找不到就加刪節號 */
+export function toLastSentence(t) {
+  t = String(t || '').trimEnd();
+  const m = t.match(/^[\s\S]*[。！？!?][」』）)]*/);
+  return m && m[0].length >= 40 ? m[0] : t + '…';
+}
+
 export async function loadSession(env, userId) {
   const raw = await env.FORTUNE_KV.get(LAMP(userId));
   if (!raw) return null;
@@ -162,8 +169,10 @@ export async function askLamp(env, userId, session, question, date) {
   const messages = history.concat([{ role: 'user', content: q }]);
   let text, fallback = false;
   try {
-    text = cleanLamp(await callAI(env, messages, buildSystem(session.m, matches, crisis), 1500,
-      { model: env.LAMP_MODEL, timeoutMs: Number(env.LAMP_TIMEOUT_MS || 25000) }));
+    const out = await callAI(env, messages, buildSystem(session.m, matches, crisis), 3000,
+      { model: env.LAMP_MODEL, timeoutMs: Number(env.LAMP_TIMEOUT_MS || 25000), withStop: true });
+    /* 字數用完被截斷時，退回最後一個完整句子，不要停在半句 */
+    text = cleanLamp(out.stop === 'max_tokens' ? toLastSentence(out.text) : out.text);
     if (!text) throw new Error('阿拉燈回覆整理後為空白');
   } catch (e) {
     console.error('lamp AI failed', e && e.message);
