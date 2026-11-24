@@ -33,6 +33,7 @@ TAROT_APP_URL = "https://kftseng2oo1.github.io/tarot/"
 TAROT_IMG_BASE = "https://kftseng2oo1.github.io/fortune-line/tarot-cards/"   # 1910 原版牌面圖（公有領域）
 AI_MODEL = "claude-haiku-5-5"
 LAMP_MODEL = "claude-haiku-5-5"   # 阿拉燈用的模型；LINE 的 reply token 有時效，用快的模型比較穩
+BUDDHA_APP_URL = "https://kftseng2oo1.github.io/buddha/"   # 「問其他上師」按鈕開的阿拉燈 App
 LAMP_DAILY_LIMIT = "10"           # 每人每天可問阿拉燈幾次（偵測到危機訊號時不受限制）
 
 # 機密值（不寫在這裡）：

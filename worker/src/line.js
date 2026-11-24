@@ -435,13 +435,10 @@ export function divineQuick() {
   return [qr('☯ 易經卜卦', 'action=iching', '易經卜卦'), qr('🔮 塔羅三張牌', 'action=tarot', '塔羅三張牌'), qr('🪔 請教阿拉燈', 'action=lamp', '請教阿拉燈')];
 }
 
-/* 阿拉燈：選導師、對話中的快速回覆 */
-export function lampMasterQuick(masters) {
-  return Object.keys(masters).map(k => qr(masters[k].emoji + ' ' + masters[k].name, 'action=lamp_master&m=' + k, '請' + masters[k].name + '開示'))
-    .concat([qr('結束對話', 'action=lamp_end')]);
-}
-export function lampQuick() {
-  return [qr('結束對話', 'action=lamp_end'), qr('換導師', 'action=lamp_pick', '換導師'), qr('今日運勢', 'action=today')];
+/* 阿拉燈：對話中的快速回覆；想問其他上師（禪宗、淨土、聖嚴法師…）就開 App */
+export const lampAppUrl = env => env.BUDDHA_APP_URL || 'https://kftseng2oo1.github.io/buddha/';
+export function lampQuick(env) {
+  return [qr('結束對話', 'action=lamp_end'), qrUri('📱 問其他上師', lampAppUrl(env)), qr('今日運勢', 'action=today')];
 }
 export function tarotCatQuick(cats) {
   return Object.keys(cats).map(k => qr(cats[k], 'action=tarot_cat&cat=' + k, '問' + cats[k]));

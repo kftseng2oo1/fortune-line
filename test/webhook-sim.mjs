@@ -242,7 +242,10 @@ env.ARCAR.fetch = async (url, init) => {
 };
 await webhook([ev('postback', { postback: { data: 'action=lamp' } })]);
 assert.match(lastReply()[0].text, /阿拉燈・佛法心靈導師/);
-assert.equal(lastReply()[0].quickReply.items.length, 8, '7 位導師＋結束對話');
+const lq = lastReply()[0].quickReply.items;
+assert.equal(lq.length, 3, '結束對話、問其他上師、今日運勢');
+assert.equal(lq[1].action.uri, 'https://kftseng2oo1.github.io/buddha/', '問其他上師開 App');
+assert.match(lastReply()[0].text, /聖嚴法師/);
 assert.equal(JSON.parse(kv.get('lamp:U_test_user')).m, 'general');
 await say('528');   /* 對話中打數字也是提問，不會被當成卜卦 */
 assert.equal(lampCalls.length, 1);
@@ -256,10 +259,11 @@ await say('最近工作壓力很大，晚上睡不著');
 assert.equal(lampCalls[1].messages.length, 3, '帶上一輪對話');
 assert.ok(!JSON.stringify(lampCalls[1]).includes('1985') && !JSON.stringify(lampCalls[1]).includes('U_test_user'), '不送生日或 userId');
 await webhook([ev('postback', { postback: { data: 'action=lamp_master&m=zen' } })]);
-assert.match(lastReply()[0].text, /禪師在此/);
+assert.match(lastReply()[0].text, /正在和阿拉燈對話中/, '舊的換導師按鈕仍可用，不會報錯');
 await say('什麼是放下');
-assert.match(lampCalls.at(-1).system, /禪宗宗師/);
-assert.equal(lampCalls.at(-1).messages.length, 1, '換導師後重新開始');
+assert.match(lampCalls.at(-1).system, /慈悲博學的佛法導師/);
+assert.ok(!/禪宗宗師/.test(lampCalls.at(-1).system), 'LINE 只用阿拉燈導師');
+assert.equal(lampCalls.at(-1).messages.length, 5, '對話延續');
 await say('我覺得活著好累，不想活了');
 assert.match(lastReply()[0].text, /1925/); assert.match(lastReply()[0].text, /1995/);
 assert.match(lampCalls.at(-1).system, /自傷或輕生訊號/);
